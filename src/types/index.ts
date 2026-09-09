@@ -11,6 +11,18 @@ export type MuscleGroup =
   | 'CORE' 
   | 'CARDIO';
 
+export type EquipmentType = Equipment;
+
+export interface ExerciseDefinition {
+  id: string;
+  name: string;
+  equipmentRequired: Equipment[];
+  environments: TrainingEnvironment[];
+  muscleGroups: MuscleGroup[];
+  difficulty: string;
+  instructions: string;
+}
+
 export interface WorkoutSet {
   id: string;
   setNumber: number;
@@ -52,14 +64,16 @@ export interface WorkoutPlan {
 
 export interface WorkoutSession {
   id: string;
-  userId: string;
-  planId: string;
-  dayId: string;
-  dayName: string;
-  startedAt: string;
+  userId?: string;
+  planId?: string;
+  dayId?: string | null;
+  dayName?: string;
+  date?: string;
+  startedAt?: string;
   completedAt?: string;
   completed: boolean;
-  exercises: WorkoutExercise[];
+  durationSeconds?: number;
+  exercises?: WorkoutExercise[];
   notes?: string;
 }
 
@@ -133,10 +147,24 @@ export interface WeightRecord {
 export interface MeasurementRecord {
   id: string;
   date: string;
+  weightKg?: number;
   chestCm?: number;
   waistCm?: number;
+  hipsCm?: number;
   armsCm?: number;
   thighsCm?: number;
+  notes?: string;
+}
+
+export type BodyMeasurement = MeasurementRecord;
+
+export interface MonthlyCheckin {
+  id: string;
+  checkinDate: string;
+  weightKg: number;
+  adherenceScore?: number;
+  summary?: string;
+  nextMonthFocus?: string;
 }
 
 export interface ProgressState {

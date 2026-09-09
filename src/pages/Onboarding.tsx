@@ -14,7 +14,8 @@ import {
   ActivityLevel, 
   TrainingExperience, 
   TrainingEnvironment, 
-  DietPreference 
+  DietPreference,
+  Equipment 
 } from '../types';
 
 interface OnboardingProps {

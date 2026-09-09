@@ -1,4 +1,5 @@
 import { Meal, MealItem } from '../../types';
+import { nutritionApi } from '../api/nutritionApi';
 
 const NUTRITION_PREFIX = 'friday_meals_';
 
@@ -7,6 +8,7 @@ export interface INutritionRepository {
   saveMeals(dateStr: string, meals: Meal[]): void;
   addMealItem(dateStr: string, mealId: string, item: MealItem): void;
   removeMealItem(dateStr: string, mealId: string, itemId: string): void;
+  syncFromBackend(dateStr: string): Promise<Meal[]>;
   clear(): void;
 }
 
@@ -19,7 +21,7 @@ export function getDefaultDayMeals(): Meal[] {
   ];
 }
 
-class LocalNutritionRepository implements INutritionRepository {
+class ApiBackedNutritionRepository implements INutritionRepository {
   private getKey(dateStr: string): string {
     return `${NUTRITION_PREFIX}${dateStr}`;
   }
@@ -52,6 +54,14 @@ class LocalNutritionRepository implements INutritionRepository {
     target.totalFat = target.items.reduce((acc, curr) => acc + curr.fat, 0);
 
     this.saveMeals(dateStr, meals);
+
+    // Sync to backend
+    nutritionApi.updateMeal(target.id, target).catch(() => {
+      // Fallback: create meal if not yet existing on backend
+      nutritionApi.createMeal(target).catch(err => {
+        console.warn('[NutritionRepository] Background meal sync failed:', err.message);
+      });
+    });
   }
 
   removeMealItem(dateStr: string, mealId: string, itemId: string): void {
@@ -66,19 +76,34 @@ class LocalNutritionRepository implements INutritionRepository {
     target.totalFat = target.items.reduce((acc, curr) => acc + curr.fat, 0);
 
     this.saveMeals(dateStr, meals);
+
+    nutritionApi.updateMeal(target.id, target).catch(err => {
+      console.warn('[NutritionRepository] Background item removal sync failed:', err.message);
+    });
+  }
+
+  async syncFromBackend(dateStr: string): Promise<Meal[]> {
+    try {
+      const data = await nutritionApi.getTodayMeals(dateStr);
+      if (data?.meals && data.meals.length > 0) {
+        this.saveMeals(dateStr, data.meals);
+        return data.meals;
+      }
+    } catch (err: any) {
+      console.warn('[NutritionRepository] Backend fetch failed:', err.message);
+    }
+    return this.getMeals(dateStr);
   }
 
   clear(): void {
     if (typeof window === 'undefined') return;
-    const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith(NUTRITION_PREFIX)) {
-        keysToRemove.push(key);
+        localStorage.removeItem(key);
       }
     }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
   }
 }
 
-export const NutritionRepository: INutritionRepository = new LocalNutritionRepository();
+export const NutritionRepository: INutritionRepository = new ApiBackedNutritionRepository();

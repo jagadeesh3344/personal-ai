@@ -113,8 +113,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
         <div className="h-full">
           <BodyStatusCard 
-            currentWeight={userProfile.currentWeight} 
-            targetWeight={userProfile.targetWeight} 
+            currentWeight={userProfile.currentWeightKg} 
+            targetWeight={userProfile.targetWeightKg} 
           />
         </div>
         <div className="h-full">

@@ -82,6 +82,25 @@ export default function App() {
     }
   }, [userProfile]);
 
+  // Initial sync from backend API when available
+  useEffect(() => {
+    ProfileRepository.syncFromBackend().then(p => {
+      if (p) setUserProfile(p);
+    });
+    WorkoutRepository.syncSessionsFromBackend().then(s => {
+      if (s && s.length > 0) setSessions(s);
+    });
+    NutritionRepository.syncFromBackend(todayStr).then(m => {
+      if (m && m.length > 0) setMeals(m);
+    });
+    HydrationRepository.syncFromBackend(todayStr).then(h => {
+      if (h) setHydration(h);
+    });
+    ProgressRepository.syncFromBackend().then(pr => {
+      if (pr) setProgressData(pr);
+    });
+  }, [todayStr]);
+
   // Determine active workout session for today
   const activeSession = sessions.find(s => s.dayId && !s.completed) || (sessions.length > 0 ? sessions[0] : null);
   const todayWorkoutDay = workoutPlan?.days[0] || null;
@@ -174,7 +193,7 @@ export default function App() {
     if (userProfile) {
       setUserProfile({
         ...userProfile,
-        currentWeight: weightKg,
+        currentWeightKg: weightKg,
         updatedAt: new Date().toISOString()
       });
     }
@@ -200,7 +219,7 @@ export default function App() {
       const firstDay = generatedPlan.days[0];
       const session: WorkoutSession = {
         id: `sess-${Date.now()}`,
-        userId: profile.id,
+        userId: 'user',
         planId: generatedPlan.id,
         dayId: firstDay.id,
         dayName: firstDay.dayName,
@@ -213,7 +232,7 @@ export default function App() {
     }
 
     // Record baseline weight
-    ProgressRepository.addWeight(profile.currentWeight);
+    ProgressRepository.addWeight(profile.currentWeightKg);
     setProgressData(ProgressRepository.getProgress());
 
     setIsOnboarded(true);

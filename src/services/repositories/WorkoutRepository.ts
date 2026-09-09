@@ -1,4 +1,5 @@
 import { WorkoutPlan, WorkoutSession } from '../../types';
+import { workoutsApi } from '../api/workoutsApi';
 
 const PLAN_KEY = 'friday_workout_plan';
 const SESSIONS_KEY = 'friday_workout_sessions';
@@ -8,10 +9,12 @@ export interface IWorkoutRepository {
   saveActivePlan(plan: WorkoutPlan): void;
   getSessions(): WorkoutSession[];
   saveSession(session: WorkoutSession): void;
+  syncSessionsFromBackend(): Promise<WorkoutSession[]>;
+  saveSessionToBackend(session: WorkoutSession): Promise<WorkoutSession>;
   clear(): void;
 }
 
-class LocalWorkoutRepository implements IWorkoutRepository {
+class ApiBackedWorkoutRepository implements IWorkoutRepository {
   getActivePlan(): WorkoutPlan | null {
     if (typeof window === 'undefined') return null;
     const raw = localStorage.getItem(PLAN_KEY);
@@ -49,6 +52,40 @@ class LocalWorkoutRepository implements IWorkoutRepository {
       current.unshift(session);
     }
     localStorage.setItem(SESSIONS_KEY, JSON.stringify(current));
+
+    // Background sync
+    this.saveSessionToBackend(session).catch(err => {
+      console.warn('[WorkoutRepository] Background session sync failed:', err.message);
+    });
+  }
+
+  async syncSessionsFromBackend(): Promise<WorkoutSession[]> {
+    try {
+      const remoteSessions = await workoutsApi.getSessions();
+      if (remoteSessions && typeof window !== 'undefined') {
+        localStorage.setItem(SESSIONS_KEY, JSON.stringify(remoteSessions));
+      }
+      return remoteSessions;
+    } catch (err: any) {
+      console.warn('[WorkoutRepository] Could not fetch sessions from backend:', err.message);
+      return this.getSessions();
+    }
+  }
+
+  async saveSessionToBackend(session: WorkoutSession): Promise<WorkoutSession> {
+    try {
+      if (session.completed) {
+        return await workoutsApi.completeSession(session.id, session.durationSeconds, session.notes);
+      } else {
+        return await workoutsApi.createSession({
+          dayId: session.dayId,
+          date: session.date,
+          notes: session.notes
+        });
+      }
+    } catch {
+      return session;
+    }
   }
 
   clear(): void {
@@ -58,4 +95,4 @@ class LocalWorkoutRepository implements IWorkoutRepository {
   }
 }
 
-export const WorkoutRepository: IWorkoutRepository = new LocalWorkoutRepository();
+export const WorkoutRepository: IWorkoutRepository = new ApiBackedWorkoutRepository();

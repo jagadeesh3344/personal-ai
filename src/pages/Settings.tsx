@@ -121,24 +121,24 @@ export const Settings: React.FC<SettingsProps> = ({
                 id="height"
                 label="HEIGHT (CM)"
                 type="number"
-                value={userProfile.height}
-                onChange={(e) => handleChange('height', parseFloat(e.target.value) || 0)}
+                value={userProfile.heightCm}
+                onChange={(e) => handleChange('heightCm', parseFloat(e.target.value) || 0)}
               />
               <Input 
                 id="weight"
                 label="CURRENT (KG)"
                 type="number"
                 step="0.1"
-                value={userProfile.currentWeight}
-                onChange={(e) => handleChange('currentWeight', parseFloat(e.target.value) || 0)}
+                value={userProfile.currentWeightKg}
+                onChange={(e) => handleChange('currentWeightKg', parseFloat(e.target.value) || 0)}
               />
               <Input 
                 id="targetWeight"
                 label="TARGET (KG)"
                 type="number"
                 step="0.1"
-                value={userProfile.targetWeight}
-                onChange={(e) => handleChange('targetWeight', parseFloat(e.target.value) || 0)}
+                value={userProfile.targetWeightKg}
+                onChange={(e) => handleChange('targetWeightKg', parseFloat(e.target.value) || 0)}
               />
             </div>
           </div>
