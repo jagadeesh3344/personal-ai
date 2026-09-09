@@ -3,8 +3,16 @@ import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
-import { UserProfile } from '../types';
-import { User, Dumbbell, Bot, ArrowLeft, ShieldCheck, Check } from 'lucide-react';
+import { 
+  UserProfile, 
+  Goal, 
+  Sex, 
+  ActivityLevel, 
+  TrainingExperience, 
+  TrainingEnvironment, 
+  DietPreference 
+} from '../types';
+import { User, Dumbbell, Bot, ArrowLeft, ShieldCheck, Check, Trash2 } from 'lucide-react';
 
 interface SettingsProps {
   userProfile: UserProfile;
@@ -21,57 +29,19 @@ export const Settings: React.FC<SettingsProps> = ({
 }) => {
   const [isSaved, setIsSaved] = useState(false);
 
-  const handleChange = (field: keyof UserProfile | string, value: any) => {
-    setUserProfile(prev => {
-      const updated = {
-        ...prev,
-        [field]: value
-      } as UserProfile;
-
-      // Ensure dynamic alignment across both legacy and modular properties
-      if (field === 'fitnessGoal') {
-        updated.goal = value;
-      } else if (field === 'goal') {
-        updated.fitnessGoal = value;
-      }
-
-      if (field === 'targetWeight') {
-        updated.preferences = {
-          ...prev.preferences,
-          targetWeight: parseFloat(value) || 0
-        };
-      }
-
-      if (field === 'workoutDaysPerWeek') {
-        updated.preferences = {
-          ...prev.preferences,
-          workoutDaysPerWeek: parseInt(value) || 0
-        };
-      }
-
-      if (field === 'preferredWorkoutTime') {
-        updated.preferences = {
-          ...prev.preferences,
-          preferredWorkoutTime: value
-        };
-      }
-
-      if (field === 'coachingStyle') {
-        updated.preferences = {
-          ...prev.preferences,
-          coachingStyle: value
-        };
-      }
-
-      return updated;
-    });
+  const handleChange = <K extends keyof UserProfile>(field: K, value: UserProfile[K]) => {
+    setUserProfile(prev => ({
+      ...prev,
+      [field]: value,
+      updatedAt: new Date().toISOString()
+    }));
   };
 
   const handleSaveNotification = () => {
     setIsSaved(true);
     setTimeout(() => {
       setIsSaved(false);
-    }, 3000);
+    }, 2500);
   };
 
   return (
@@ -81,41 +51,39 @@ export const Settings: React.FC<SettingsProps> = ({
         <div>
           <button 
             onClick={() => setTab('dashboard')} 
-            className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-white uppercase tracking-wider mb-2"
+            className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-white uppercase tracking-wider mb-2 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" /> Dashboard
           </button>
-          <h1 className="text-xl font-black text-white uppercase tracking-tight">Settings</h1>
+          <h1 className="text-xl font-black text-white uppercase tracking-tight">System Settings</h1>
           <p className="text-xs text-zinc-400 mt-1">
-            Update your profile details, fitness goals, and training preferences.
+            Manage your single source of truth biometrics, training parameters, and profile.
           </p>
         </div>
 
         <Button 
           variant={isSaved ? "outline" : "primary"} 
           onClick={handleSaveNotification} 
-          className={`w-full sm:w-auto transition-all duration-300 ${isSaved ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10' : ''}`}
+          className={`w-full sm:w-auto transition-all ${isSaved ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10' : ''}`}
         >
           {isSaved ? (
             <span className="flex items-center justify-center gap-2 uppercase tracking-wider text-xs">
-              <Check className="w-4 h-4" /> Changes Saved
+              <Check className="w-4 h-4" /> Profile Saved
             </span>
           ) : (
-            <span className="flex items-center gap-2 uppercase tracking-wider text-xs">
+            <span className="flex items-center gap-2 uppercase tracking-wider text-xs font-bold">
               <ShieldCheck className="w-4 h-4" /> Save Changes
             </span>
           )}
         </Button>
       </div>
 
-      {/* Main Settings Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* Section 1: Physical parameters profile */}
+        {/* Section 1: Demographics & Biometrics */}
         <Card className="p-5 bg-zinc-950/40 border-zinc-850" hoverEffect={false}>
           <div className="flex items-center gap-2 pb-3 border-b border-zinc-900 mb-5">
-            <User className="w-4.5 h-4.5 text-cyan-400" />
-            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Operator Identity</h3>
+            <User className="w-4 h-4 text-cyan-400" />
+            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">User Identity & Biometrics</h3>
           </div>
 
           <div className="space-y-4">
@@ -133,156 +101,138 @@ export const Settings: React.FC<SettingsProps> = ({
                 label="AGE"
                 type="number"
                 value={userProfile.age}
-                onChange={(e) => handleChange('age', parseInt(e.target.value) || 0)}
-                placeholder="e.g. 26"
+                onChange={(e) => handleChange('age', parseInt(e.target.value, 10) || 0)}
               />
+              <Select
+                id="sex"
+                label="SEX"
+                value={userProfile.sex}
+                onChange={(e) => handleChange('sex', e.target.value as Sex)}
+                options={[
+                  { value: 'MALE', label: 'Male' },
+                  { value: 'FEMALE', label: 'Female' },
+                  { value: 'OTHER', label: 'Other / Neutral' }
+                ]}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
               <Input 
                 id="height"
                 label="HEIGHT (CM)"
                 type="number"
                 value={userProfile.height}
-                onChange={(e) => handleChange('height', parseInt(e.target.value) || 0)}
-                placeholder="e.g. 178"
+                onChange={(e) => handleChange('height', parseFloat(e.target.value) || 0)}
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
               <Input 
                 id="weight"
-                label="CURRENT WEIGHT (KG)"
+                label="CURRENT (KG)"
                 type="number"
                 step="0.1"
-                value={userProfile.weight}
-                onChange={(e) => handleChange('weight', parseFloat(e.target.value) || 0)}
-                placeholder="e.g. 74.2"
+                value={userProfile.currentWeight}
+                onChange={(e) => handleChange('currentWeight', parseFloat(e.target.value) || 0)}
               />
               <Input 
-                id="target-weight"
-                label="TARGET WEIGHT (KG)"
+                id="targetWeight"
+                label="TARGET (KG)"
                 type="number"
                 step="0.1"
                 value={userProfile.targetWeight}
                 onChange={(e) => handleChange('targetWeight', parseFloat(e.target.value) || 0)}
-                placeholder="e.g. 68"
               />
             </div>
           </div>
         </Card>
 
-        {/* Section 2: Fitness Goal & Training context */}
+        {/* Section 2: Training Environment & Experience */}
         <Card className="p-5 bg-zinc-950/40 border-zinc-850" hoverEffect={false}>
           <div className="flex items-center gap-2 pb-3 border-b border-zinc-900 mb-5">
-            <Dumbbell className="w-4.5 h-4.5 text-cyan-400" />
-            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Tactical Goal & Training</h3>
+            <Dumbbell className="w-4 h-4 text-cyan-400" />
+            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Training Configuration</h3>
           </div>
 
           <div className="space-y-4">
             <Select 
-              id="fitness-goal"
-              label="PRIMARY BIOMETRIC OBJECTIVE"
-              value={userProfile.fitnessGoal}
-              onChange={(e) => handleChange('fitnessGoal', e.target.value)}
+              id="goal"
+              label="PRIMARY FITNESS OBJECTIVE"
+              value={userProfile.goal}
+              onChange={(e) => handleChange('goal', e.target.value as Goal)}
               options={[
-                { value: 'Build Muscle', label: 'Build Muscle' },
-                { value: 'Lose Fat', label: 'Lose Fat' },
-                { value: 'Body Recomposition', label: 'Body Recomposition' },
-                { value: 'Improve Fitness', label: 'Improve Fitness' }
+                { value: 'FAT_LOSS', label: 'Fat Loss (Caloric Deficit)' },
+                { value: 'GAIN_MUSCLE', label: 'Muscle Gain (Hypertrophy Surplus)' },
+                { value: 'BODY_RECOMPOSITION', label: 'Body Recomposition' },
+                { value: 'STRENGTH', label: 'Strength Focus' },
+                { value: 'GENERAL_FITNESS', label: 'General Health & Fitness' },
+                { value: 'ENDURANCE', label: 'Cardiovascular & Endurance' }
               ]}
             />
 
             <div className="grid grid-cols-2 gap-4">
               <Select 
-                id="training-env"
+                id="environment"
                 label="TRAINING ENVIRONMENT"
                 value={userProfile.trainingEnvironment}
-                onChange={(e) => handleChange('trainingEnvironment', e.target.value)}
+                onChange={(e) => handleChange('trainingEnvironment', e.target.value as TrainingEnvironment)}
                 options={[
-                  { value: 'Gym', label: 'Tactical Gym' },
-                  { value: 'Home', label: 'Home Environment' }
+                  { value: 'HOME', label: 'Home Environment' },
+                  { value: 'GYM', label: 'Commercial Gym' },
+                  { value: 'OUTDOOR', label: 'Outdoor' }
                 ]}
               />
+
               <Select 
-                id="training-exp"
-                label="EXPERIENCE SPECTRUM"
+                id="experience"
+                label="TRAINING EXPERIENCE"
                 value={userProfile.trainingExperience}
-                onChange={(e) => handleChange('trainingExperience', e.target.value)}
+                onChange={(e) => handleChange('trainingExperience', e.target.value as TrainingExperience)}
                 options={[
-                  { value: 'Beginner', label: 'Beginner Level' },
-                  { value: 'Intermediate', label: 'Intermediate Level' },
-                  { value: 'Advanced', label: 'Advanced Level' }
+                  { value: 'BEGINNER', label: 'Beginner (0-1 yrs)' },
+                  { value: 'INTERMEDIATE', label: 'Intermediate (1-3 yrs)' },
+                  { value: 'ADVANCED', label: 'Advanced (3+ yrs)' }
                 ]}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Input 
-                id="workout-days"
-                label="PROTOCOL DAYS PER WEEK"
-                type="number"
-                value={userProfile.workoutDaysPerWeek}
-                onChange={(e) => handleChange('workoutDaysPerWeek', parseInt(e.target.value) || 0)}
-                placeholder="e.g. 4"
-              />
-              <Input 
-                id="workout-time"
-                label="PREFERRED TIME (HH:MM)"
-                value={userProfile.preferredWorkoutTime}
-                onChange={(e) => handleChange('preferredWorkoutTime', e.target.value)}
-                placeholder="e.g. 18:30"
-              />
-            </div>
-          </div>
-        </Card>
-
-        {/* Section 3: FRIDAY Cognitive Intelligence profile settings */}
-        <Card className="p-5 bg-zinc-950/40 border-zinc-850 md:col-span-2" hoverEffect={false}>
-          <div className="flex items-center gap-2 pb-3 border-b border-zinc-900 mb-5">
-            <Bot className="w-4.5 h-4.5 text-cyan-400" />
-            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">FRIDAY Cognitive Preferences</h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-            <div>
               <Select 
-                id="coaching-style"
-                label="COGNITIVE COACHING STYLE"
-                value={userProfile.coachingStyle}
-                onChange={(e) => handleChange('coachingStyle', e.target.value)}
+                id="diet"
+                label="DIET PREFERENCE"
+                value={userProfile.dietPreference}
+                onChange={(e) => handleChange('dietPreference', e.target.value as DietPreference)}
                 options={[
-                  { value: 'Supportive', label: 'Supportive & Encouraging' },
-                  { value: 'Balanced', label: 'Balanced Tactical Logic (Default)' },
-                  { value: 'Direct', label: 'Direct & Scientific' },
-                  { value: 'Strict', label: 'Strict Military Command OS' }
+                  { value: 'STANDARD', label: 'Standard' },
+                  { value: 'VEGETARIAN', label: 'Vegetarian' },
+                  { value: 'VEGAN', label: 'Vegan' },
+                  { value: 'KETO', label: 'Keto' },
+                  { value: 'PALEO', label: 'Paleo' }
                 ]}
               />
-              <p className="text-[10px] text-zinc-500 mt-2 leading-relaxed">
-                Reconfiguring coaching filters alters conversation syntax, tone metrics, and tactical feedback urgency.
-              </p>
-            </div>
 
-            <div className="p-4 rounded-xl bg-zinc-900/30 border border-zinc-850">
-              <span className="text-[10px] font-bold text-cyan-400 block mb-1 uppercase tracking-widest">ACTIVE PROTOCOL: BALANCED</span>
-              <p className="text-[11px] text-zinc-450 leading-relaxed">
-                FRIDAY will balance warm motivational feedback loops with rigorous biometric statistics, warning you when daily targets are at-risk, and prioritizing clean recovery.
-              </p>
+              <Input 
+                id="duration"
+                label="SESSION DURATION (MIN)"
+                type="number"
+                value={userProfile.preferredWorkoutDuration}
+                onChange={(e) => handleChange('preferredWorkoutDuration', parseInt(e.target.value, 10) || 45)}
+              />
             </div>
           </div>
         </Card>
 
-        {/* Section 4: Admin and reset controls */}
-        <Card className="p-5 bg-zinc-950/40 border-zinc-850 md:col-span-2 border-red-950/10" hoverEffect={false}>
-          <div className="flex items-center gap-2 pb-3 border-b border-zinc-900 mb-5">
-            <Bot className="w-4.5 h-4.5 text-red-500" />
-            <h3 className="text-xs font-bold text-red-400 uppercase tracking-wider">Tactical System Reset</h3>
+        {/* Section 3: Reset & Factory Clear */}
+        <Card className="p-5 bg-zinc-950/40 border-zinc-850 md:col-span-2 border-red-950/20" hoverEffect={false}>
+          <div className="flex items-center gap-2 pb-3 border-b border-zinc-900 mb-4">
+            <Trash2 className="w-4 h-4 text-red-500" />
+            <h3 className="text-xs font-bold text-red-400 uppercase tracking-wider">Reset Application Profile</h3>
           </div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <p className="text-[11px] text-zinc-400 max-w-lg leading-relaxed">
-              Resetting onboarding deletes cached offline parameters, including goal settings, physical telemetry logs, baseline photograph references, and custom workout structures. This triggers a fresh biometric acquisition loop.
+            <p className="text-xs text-zinc-400 max-w-xl leading-relaxed">
+              Resetting restarts the 10-step onboarding sequence, clears locally stored workout logs, and regenerates your training baseline.
             </p>
             <Button 
               variant="outline" 
               onClick={onResetOnboarding}
-              className="text-red-400 hover:text-red-350 hover:bg-red-500/10 border-red-500/20 uppercase tracking-wider text-[10px] shrink-0 font-bold"
+              className="text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/30 uppercase text-xs shrink-0 font-bold"
             >
               Reset Onboarding Flow
             </Button>

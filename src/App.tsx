@@ -2,518 +2,283 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { MobileNav } from './components/layout/MobileNav';
-import { FridayMessage, UserProfile, Workout, DailyStats, Task, Nutrition, HydrationData, Meal } from './types';
+
+// Types
+import { 
+  UserProfile, 
+  WorkoutPlan, 
+  WorkoutSession, 
+  Meal, 
+  MealItem, 
+  DailyHydration, 
+  ProgressState, 
+  DailyTask, 
+  FridayMessage,
+  Habit 
+} from './types';
+
+// Repositories
+import { ProfileRepository } from './services/repositories/ProfileRepository';
+import { WorkoutRepository } from './services/repositories/WorkoutRepository';
+import { NutritionRepository } from './services/repositories/NutritionRepository';
+import { HydrationRepository } from './services/repositories/HydrationRepository';
+import { ProgressRepository } from './services/repositories/ProgressRepository';
+
+// Calculators & Generator
+import { calculateNutritionTargets } from './utils/nutritionCalculator';
+import { calculateHydrationTarget } from './utils/hydrationCalculator';
+import { generateWorkoutPlan } from './utils/workoutGenerator';
 
 // Pages
+import { Onboarding } from './pages/Onboarding';
 import { Dashboard } from './pages/Dashboard';
 import { Workout as WorkoutPage } from './pages/Workout';
 import { Nutrition as NutritionPage } from './pages/Nutrition';
 import { Habits } from './pages/Habits';
-import { Progress } from './pages/Progress';
-import { Friday } from './pages/Friday';
-import { Settings } from './pages/Settings';
-
-// Mock Initial Data
-import {
-  initialUserProfile,
-  initialDailyStats,
-  initialTasks,
-  initialWorkouts,
-  initialNutrition,
-  initialHydration,
-  initialMeals,
-  initialHabits,
-  initialProgress,
-  initialFridayMessages
-} from './data/mockData';
-
-import { Onboarding } from './pages/Onboarding';
-import { generateFilteredWorkouts } from './data/exerciseDb';
-import { nutritionService } from './services/nutritionService';
+import { Progress as ProgressPage } from './pages/Progress';
+import { Friday as FridayPage } from './pages/Friday';
+import { Settings as SettingsPage } from './pages/Settings';
 
 export default function App() {
+  const todayStr = new Date().toISOString().split('T')[0];
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
 
-  // State Management
-  const [isOnboarded, setIsOnboarded] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('friday_onboarded') === 'true';
+  // Core State backed by clean repository abstraction
+  const [isOnboarded, setIsOnboarded] = useState<boolean>(() => ProfileRepository.isOnboarded());
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => ProfileRepository.getProfile());
+  const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(() => WorkoutRepository.getActivePlan());
+  const [sessions, setSessions] = useState<WorkoutSession[]>(() => WorkoutRepository.getSessions());
+  const [meals, setMeals] = useState<Meal[]>(() => NutritionRepository.getMeals(todayStr));
+
+  // Calculated Targets
+  const nutritionTargets = userProfile ? calculateNutritionTargets(userProfile) : null;
+  const targetHydrationMl = userProfile ? calculateHydrationTarget(userProfile) : 2500;
+
+  const [hydration, setHydration] = useState<DailyHydration>(() => 
+    HydrationRepository.getHydration(todayStr, targetHydrationMl)
+  );
+  const [progressData, setProgressData] = useState<ProgressState>(() => ProgressRepository.getProgress());
+
+  const [habits, setHabits] = useState<Habit[]>(() => [
+    { id: 'h1', name: 'Workout Routine', icon: 'Dumbbell', streak: 0, weeklyHistory: { Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false }, currentCompleted: false },
+    { id: 'h2', name: 'Protein Target', icon: 'Beef', streak: 0, weeklyHistory: { Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false }, currentCompleted: false },
+    { id: 'h3', name: 'Hydration Intake', icon: 'GlassWater', streak: 0, weeklyHistory: { Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false }, currentCompleted: false },
+  ]);
+
+  const [fridayMessages, setFridayMessages] = useState<FridayMessage[]>(() => [
+    {
+      id: 'init-msg',
+      sender: 'friday',
+      text: 'FRIDAY AI System Online. Telemetry and tool interfaces connected.',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      category: 'system'
     }
-    return false;
-  });
+  ]);
 
-  const [userPhoto, setUserPhoto] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('friday_user_photo');
-    }
-    return null;
-  });
-
-  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('friday_user_profile');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialUserProfile;
-  });
-
-  const [dailyStats, setDailyStats] = useState<DailyStats>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('friday_daily_stats');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialDailyStats;
-  });
-
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('friday_tasks');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialTasks;
-  });
-
-  const [workouts, setWorkouts] = useState<Workout[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('friday_workouts');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialWorkouts;
-  });
-
-  const [hydration, setHydration] = useState<HydrationData>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('friday_hydration');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialHydration;
-  });
-
-  const [meals, setMeals] = useState<Meal[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('friday_meals');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialMeals;
-  });
-
-  // Fully Derived Nutrition State (Single Source of Truth)
-  const targets = nutritionService.calculateTargets(userProfile);
-  const currentCalories = meals.reduce((acc, m) => acc + (m.totalCalories || 0), 0);
-  const currentProtein = meals.reduce((acc, m) => acc + (m.totalProtein || 0), 0);
-  const currentCarbs = meals.reduce((acc, m) => acc + (m.totalCarbs || 0), 0);
-  const currentFat = meals.reduce((acc, m) => acc + (m.totalFat || 0), 0);
-
-  const nutrition: Nutrition = {
-    calories: { current: currentCalories, target: targets.calories },
-    protein: { current: currentProtein, target: targets.protein },
-    carbs: { current: currentCarbs, target: targets.carbs },
-    fat: { current: currentFat, target: targets.fat },
-    waterIntakeLiters: parseFloat((hydration.consumedMl / 1000).toFixed(2)),
-    waterTargetLiters: targets.waterLiters
-  };
-
-  const [habits, setHabits] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('friday_habits');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialHabits;
-  });
-
-  const [progressData, setProgressData] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('friday_progress_data');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialProgress;
-  });
-
-  const [fridayMessages, setFridayMessages] = useState<FridayMessage[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('friday_messages');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialFridayMessages;
-  });
-
-  // Automatically write state changes to localStorage
+  // Sync profile edits to ProfileRepository
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('friday_user_profile', JSON.stringify(userProfile));
+    if (userProfile) {
+      ProfileRepository.saveProfile(userProfile);
     }
   }, [userProfile]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('friday_daily_stats', JSON.stringify(dailyStats));
+  // Determine active workout session for today
+  const activeSession = sessions.find(s => s.dayId && !s.completed) || (sessions.length > 0 ? sessions[0] : null);
+  const todayWorkoutDay = workoutPlan?.days[0] || null;
+
+  // Real, dynamic tasks derived from actual telemetry
+  const totalProteinConsumed = meals.reduce((a, m) => a + m.totalProtein, 0);
+  const targetProteinGrams = nutritionTargets?.proteinGrams || 140;
+
+  const waterConsumedLiters = (hydration.consumedMl / 1000).toFixed(2);
+  const waterTargetLiters = (hydration.targetMl / 1000).toFixed(1);
+  const isHydrationGoalMet = hydration.consumedMl >= hydration.targetMl;
+
+  const isWorkoutCompleted = activeSession?.completed || false;
+  const isProteinMet = totalProteinConsumed >= targetProteinGrams;
+
+  const tasks: DailyTask[] = [
+    {
+      id: 't-hydr',
+      category: 'hydration',
+      title: `Hydration Target (${waterTargetLiters}L)`,
+      completed: isHydrationGoalMet,
+      value: `${waterConsumedLiters}L / ${waterTargetLiters}L`
+    },
+    {
+      id: 't-work',
+      category: 'workout',
+      title: todayWorkoutDay ? `Complete ${todayWorkoutDay.dayName}` : 'Complete Daily Workout',
+      completed: isWorkoutCompleted,
+      value: isWorkoutCompleted ? 'Completed ✓' : 'Incomplete'
+    },
+    {
+      id: 't-nutr',
+      category: 'nutrition',
+      title: `Reach Protein Target (${targetProteinGrams}g)`,
+      completed: isProteinMet,
+      value: `${totalProteinConsumed}g / ${targetProteinGrams}g`
     }
-  }, [dailyStats]);
+  ];
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('friday_tasks', JSON.stringify(tasks));
-    }
-  }, [tasks]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('friday_workouts', JSON.stringify(workouts));
-    }
-  }, [workouts]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('friday_nutrition', JSON.stringify(nutrition));
-    }
-  }, [nutrition]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('friday_hydration', JSON.stringify(hydration));
-    }
-  }, [hydration]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('friday_meals', JSON.stringify(meals));
-    }
-  }, [meals]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('friday_habits', JSON.stringify(habits));
-    }
-  }, [habits]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('friday_progress_data', JSON.stringify(progressData));
-    }
-  }, [progressData]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('friday_messages', JSON.stringify(fridayMessages));
-    }
-  }, [fridayMessages]);
-
-  // Dynamically re-generate workouts if profile parameters (location, goal, equipment) change
-  useEffect(() => {
-    if (isOnboarded) {
-      const generated = generateFilteredWorkouts(
-        userProfile.trainingEnvironment,
-        userProfile.equipment || [],
-        userProfile.goal || userProfile.fitnessGoal
-      );
-      if (generated && generated.length > 0) {
-        const currentWorkoutName = workouts[0]?.name;
-        const currentExercisesCount = workouts[0]?.exercises.length;
-        const newWorkoutName = generated[0]?.name;
-        const newExercisesCount = generated[0]?.exercises.length;
-        
-        // Only trigger an update if the generated workout differs structurally
-        if (currentWorkoutName !== newWorkoutName || currentExercisesCount !== newExercisesCount) {
-          setWorkouts(generated);
-        }
-      }
-    }
-  }, [
-    userProfile.trainingEnvironment, 
-    userProfile.goal, 
-    userProfile.fitnessGoal, 
-    JSON.stringify(userProfile.equipment), 
-    isOnboarded
-  ]);
-
-  // Synchronize workout task title dynamically with active workout name
-  useEffect(() => {
-    const activeWorkout = workouts[0];
-    if (activeWorkout) {
-      setTasks(currentTasks => {
-        const hasWorkoutTask = currentTasks.some(t => t.category === 'workout');
-        if (hasWorkoutTask) {
-          return currentTasks.map(t => {
-            if (t.category === 'workout') {
-              const expectedTitle = `Complete ${activeWorkout.name} workout`;
-              if (t.title !== expectedTitle) {
-                return { ...t, title: expectedTitle };
-              }
-            }
-            return t;
-          });
-        }
-        return currentTasks;
-      });
-    }
-  }, [workouts]);
-
-  // Sync state between Tasks checklist and Today's Score dynamically
-  useEffect(() => {
-    // Dynamically calculate efficiency score based on task completions & hydration logs
-    const completedCount = tasks.filter(t => t.completed).length;
-    const computedScore = Math.min(100, Math.round((completedCount / tasks.length) * 100));
-
-    // Dynamic breakdown matching
-    const workoutDone = tasks.find(t => t.category === 'workout')?.completed ? 20 : 0;
-    const nutritionDone = tasks.find(t => t.category === 'nutrition')?.completed ? 30 : 15;
-    const stepsDone = tasks.find(t => t.category === 'steps')?.completed ? 20 : 10;
-    const sleepDone = tasks.find(t => t.category === 'sleep')?.completed ? 15 : 10;
-    
-    const waterGoal = nutrition.waterTargetLiters;
-    const waterLog = nutrition.waterIntakeLiters;
-    const hydrationDone = Math.min(15, Math.round((waterLog / waterGoal) * 15));
-
-    setDailyStats(prev => ({
-      ...prev,
-      score: computedScore,
-      scoreBreakdown: {
-        workout: workoutDone,
-        nutrition: nutritionDone,
-        hydration: hydrationDone,
-        steps: stepsDone,
-        sleep: sleepDone
-      }
-    }));
-  }, [tasks, nutrition.waterIntakeLiters]);
-
-  // Sync with habits completion lists
-  useEffect(() => {
-    // Map today's tasks completion lists back to habits
-    setHabits(prev => prev.map(h => {
-      if (h.id === 'h1') { // Workout Routine
-        const done = tasks.find(t => t.category === 'workout')?.completed || false;
-        return { ...h, currentCompleted: done };
-      }
-      if (h.id === 'h2') { // Protein Target
-        const done = tasks.find(t => t.category === 'nutrition')?.completed || false;
-        return { ...h, currentCompleted: done };
-      }
-      if (h.id === 'h3') { // Water Intake
-        const done = tasks.find(t => t.category === 'hydration')?.completed || false;
-        return { ...h, currentCompleted: done };
-      }
-      if (h.id === 'h4') { // Steps
-        const done = tasks.find(t => t.category === 'steps')?.completed || false;
-        return { ...h, currentCompleted: done };
-      }
-      if (h.id === 'h5') { // Sleep
-        const done = tasks.find(t => t.category === 'sleep')?.completed || false;
-        return { ...h, currentCompleted: done };
-      }
-      return h;
-    }));
-  }, [tasks]);
-
+  // Actions
   const handleAddWater = (amountMl: number) => {
-    setHydration(prev => {
-      const newEntries = [
-        ...prev.entries,
-        {
-          id: `hyt-${Date.now()}`,
-          amountMl,
-          timestamp: new Date().toISOString()
-        }
-      ];
-      return {
-        ...prev,
-        consumedMl: prev.consumedMl + amountMl,
-        entries: newEntries
-      };
-    });
+    const updated = HydrationRepository.logWater(todayStr, amountMl, targetHydrationMl);
+    setHydration({ ...updated });
   };
 
-  const handleDeleteWaterEntry = (id: string) => {
-    setHydration(prev => {
-      const entryToDelete = prev.entries.find(e => e.id === id);
-      if (!entryToDelete) return prev;
-      const newEntries = prev.entries.filter(e => e.id !== id);
-      return {
-        ...prev,
-        consumedMl: Math.max(0, prev.consumedMl - entryToDelete.amountMl),
-        entries: newEntries
-      };
-    });
+  const handleDeleteWaterEntry = (entryId: string) => {
+    const updated = HydrationRepository.removeEntry(todayStr, entryId);
+    setHydration({ ...updated });
   };
 
-  // Central Tasks Synchronization Effect (reactive alignment)
-  useEffect(() => {
-    setTasks(currentTasks => {
-      let changed = false;
-      const updated = currentTasks.map(t => {
-        if (t.category === 'hydration') {
-          const expectedVal = `${nutrition.waterIntakeLiters.toFixed(2)}L / ${nutrition.waterTargetLiters.toFixed(1)}L`;
-          const expectedComp = nutrition.waterIntakeLiters >= nutrition.waterTargetLiters;
-          if (t.value !== expectedVal || t.completed !== expectedComp) {
-            changed = true;
-            return { ...t, value: expectedVal, completed: expectedComp };
-          }
-        }
-        if (t.category === 'nutrition') {
-          const expectedVal = `${Math.round(nutrition.protein.current)}g / ${Math.round(nutrition.protein.target)}g`;
-          const expectedComp = nutrition.protein.current >= nutrition.protein.target;
-          if (t.value !== expectedVal || t.completed !== expectedComp) {
-            changed = true;
-            return { ...t, value: expectedVal, completed: expectedComp };
-          }
-        }
-        return t;
-      });
-      return changed ? updated : currentTasks;
-    });
-  }, [nutrition.waterIntakeLiters, nutrition.waterTargetLiters, nutrition.protein.current, nutrition.protein.target]);
-
-  const handleToggleTask = (id: string) => {
-    setTasks(prev => prev.map(t => {
-      if (t.id === id) {
-        return { ...t, completed: !t.completed };
-      }
-      return t;
-    }));
+  const handleAddMealItem = (mealId: string, item: MealItem) => {
+    NutritionRepository.addMealItem(todayStr, mealId, item);
+    setMeals(NutritionRepository.getMeals(todayStr));
   };
 
-  // Callback when a workout is finished
-  const handleCompleteWorkout = () => {
-    // Mark active workout as completed
-    setWorkouts(prev => prev.map(w => ({ ...w, completed: true })));
+  const handleDeleteMealItem = (mealId: string, itemIdx: number) => {
+    const meal = meals.find(m => m.id === mealId);
+    if (!meal || !meal.items[itemIdx]) return;
+    NutritionRepository.removeMealItem(todayStr, mealId, meal.items[itemIdx].id);
+    setMeals(NutritionRepository.getMeals(todayStr));
+  };
 
-    // Toggle workout task as completed
-    setTasks(prev => prev.map(t => {
-      if (t.category === 'workout') {
-        return { ...t, completed: true };
-      }
-      return t;
-    }));
+  const handleUpdateSession = (session: WorkoutSession) => {
+    WorkoutRepository.saveSession(session);
+    setSessions(WorkoutRepository.getSessions());
+  };
 
-    // Alert and sync
+  const handleCompleteSession = (session: WorkoutSession) => {
+    const finished: WorkoutSession = {
+      ...session,
+      completed: true,
+      completedAt: new Date().toISOString()
+    };
+    WorkoutRepository.saveSession(finished);
+    setSessions(WorkoutRepository.getSessions());
+
     const confirmationMsg: FridayMessage = {
-      id: `msg-sys-${Date.now()}`,
+      id: `msg-${Date.now()}`,
       sender: 'friday',
-      text: "Outstanding achievement, Operator. Your Push Day workout protocol has been archived. Biometric indicators suggest 100% muscle engagement.",
-      timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      category: 'success'
+      text: `Session "${session.dayName}" recorded successfully. Excellent effort, Operator.`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      category: 'workout'
     };
-
     setFridayMessages(prev => [...prev, confirmationMsg]);
-    setCurrentTab('workout');
   };
 
-  const handleAddMealTransition = () => {
-    setCurrentTab('nutrition');
+  const handleAddWeight = (weightKg: number) => {
+    const updated = ProgressRepository.addWeight(weightKg);
+    setProgressData({ ...updated });
+    if (userProfile) {
+      setUserProfile({
+        ...userProfile,
+        currentWeight: weightKg,
+        updatedAt: new Date().toISOString()
+      });
+    }
   };
 
-  // Onboarding Callback Handlers
-  const handleOnboardingComplete = (
-    profile: Partial<UserProfile>,
-    photo: string | null,
-    customWorkouts: Workout[]
-  ) => {
-    const completeProfile: UserProfile = {
-      id: profile.id || `user-${Date.now()}`,
-      name: profile.name || "Jagadeesh",
-      goal: profile.goal || "Fat Loss",
-      weight: profile.weight || 74.2,
-      currentWeight: profile.currentWeight || profile.weight || 74.2,
-      height: profile.height || 178,
-      age: profile.age || 26,
-      sex: profile.sex || "Male",
-      trainingExperience: profile.trainingExperience || "Intermediate",
-      activityLevel: profile.activityLevel || "Moderately Active",
-      trainingEnvironment: profile.trainingEnvironment || "Gym",
-      equipment: profile.equipment || [],
-      dietPreference: profile.dietPreference || "Standard",
-      foodPreferences: profile.foodPreferences || [],
-      allergies: profile.allergies || [],
-      exercisePreferences: profile.exercisePreferences || { liked: [], disliked: [] },
-      availableWorkoutDays: profile.availableWorkoutDays || ["Mon", "Wed", "Fri", "Sat"],
-      workoutDuration: profile.workoutDuration || 45,
-      bodyPhoto: photo || profile.bodyPhoto || null,
-      preferences: profile.preferences || {
-        coachingStyle: "Balanced",
-        workoutDaysPerWeek: 4,
-        preferredWorkoutTime: "18:30",
-        targetWeight: profile.targetWeight || 68.0
-      },
-      // Backward compatibility fields
-      fitnessGoal: profile.goal || "Fat Loss",
-      targetWeight: profile.targetWeight || 68.0,
-      workoutDaysPerWeek: profile.workoutDaysPerWeek || 4,
-      preferredWorkoutTime: profile.preferredWorkoutTime || "18:30",
-      coachingStyle: profile.coachingStyle || "Balanced"
-    };
+  const handleAddMeasurement = (meas: { date: string; chestCm?: number; waistCm?: number; armsCm?: number; thighsCm?: number }) => {
+    const updated = ProgressRepository.addMeasurement(meas);
+    setProgressData({ ...updated });
+  };
 
-    setUserProfile(completeProfile);
-    
-    setDailyStats(prev => ({
-      ...prev,
-      weight: completeProfile.weight,
-      targetWeight: completeProfile.preferences.targetWeight,
-    }));
+  const handleOnboardingComplete = (profile: UserProfile) => {
+    ProfileRepository.saveProfile(profile);
+    ProfileRepository.setOnboarded(true);
+    setUserProfile(profile);
 
-    if (customWorkouts && customWorkouts.length > 0) {
-      setWorkouts(customWorkouts);
+    // Deterministically generate workout plan
+    const generatedPlan = generateWorkoutPlan(profile);
+    WorkoutRepository.saveActivePlan(generatedPlan);
+    setWorkoutPlan(generatedPlan);
+
+    // Initial session for Day 1
+    if (generatedPlan.days.length > 0) {
+      const firstDay = generatedPlan.days[0];
+      const session: WorkoutSession = {
+        id: `sess-${Date.now()}`,
+        userId: profile.id,
+        planId: generatedPlan.id,
+        dayId: firstDay.id,
+        dayName: firstDay.dayName,
+        startedAt: new Date().toISOString(),
+        completed: false,
+        exercises: firstDay.exercises
+      };
+      WorkoutRepository.saveSession(session);
+      setSessions([session]);
     }
 
-    if (photo) {
-      setUserPhoto(photo);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('friday_user_photo', photo);
-      }
-    }
+    // Record baseline weight
+    ProgressRepository.addWeight(profile.currentWeight);
+    setProgressData(ProgressRepository.getProgress());
 
     setIsOnboarded(true);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('friday_onboarded', 'true');
-    }
   };
 
   const handleResetOnboarding = () => {
+    ProfileRepository.clear();
+    WorkoutRepository.clear();
+    NutritionRepository.clear();
+    HydrationRepository.clear();
+    ProgressRepository.clear();
+
     setIsOnboarded(false);
-    setUserPhoto(null);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('friday_onboarded');
-      localStorage.removeItem('friday_user_photo');
-    }
-    setUserProfile(initialUserProfile);
-    setWorkouts(initialWorkouts);
+    setUserProfile(null);
+    setWorkoutPlan(null);
+    setSessions([]);
+    setMeals(NutritionRepository.getMeals(todayStr));
+    setHydration(HydrationRepository.getHydration(todayStr, 2500));
+    setProgressData(ProgressRepository.getProgress());
     setCurrentTab('dashboard');
   };
 
-  // Render Page Content
+  if (!isOnboarded || !userProfile) {
+    return <Onboarding onComplete={handleOnboardingComplete} />;
+  }
+
   const renderTabContent = () => {
     switch (currentTab) {
       case 'dashboard':
         return (
           <Dashboard
             userProfile={userProfile}
-            dailyStats={dailyStats}
+            workoutPlan={workoutPlan}
+            todayWorkout={todayWorkoutDay}
+            activeSession={activeSession}
+            nutritionTargets={nutritionTargets}
+            meals={meals}
+            hydration={hydration}
             tasks={tasks}
-            workouts={workouts}
-            nutrition={nutrition}
-            onToggleTask={handleToggleTask}
+            onToggleTask={() => {}}
             setTab={setCurrentTab}
-            onAddMealClick={handleAddMealTransition}
+            onAddMealClick={() => setCurrentTab('nutrition')}
             onAddWater={handleAddWater}
           />
         );
       case 'workout':
         return (
           <WorkoutPage
-            workouts={workouts}
-            setWorkouts={setWorkouts}
-            onCompleteWorkout={handleCompleteWorkout}
+            plan={workoutPlan}
+            activeSession={activeSession}
+            onUpdateSession={handleUpdateSession}
+            onCompleteSession={handleCompleteSession}
             setTab={setCurrentTab}
           />
         );
       case 'nutrition':
         return (
           <NutritionPage
-            nutrition={nutrition}
+            targets={nutritionTargets}
+            meals={meals}
             hydration={hydration}
+            onAddMealItem={handleAddMealItem}
+            onDeleteMealItem={handleDeleteMealItem}
             onAddWater={handleAddWater}
             onDeleteWaterEntry={handleDeleteWaterEntry}
-            meals={meals}
-            setMeals={setMeals}
             setTab={setCurrentTab}
           />
         );
@@ -527,58 +292,34 @@ export default function App() {
         );
       case 'progress':
         return (
-          <Progress
+          <ProgressPage
             progressData={progressData}
-            setProgressData={setProgressData}
-            userPhoto={userPhoto}
-            onUpdatePhoto={(photo) => {
-              setUserPhoto(photo);
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('friday_user_photo', photo);
-              }
-            }}
+            onAddWeight={handleAddWeight}
+            onAddMeasurement={handleAddMeasurement}
             setTab={setCurrentTab}
           />
         );
       case 'friday':
         return (
-          <Friday
+          <FridayPage
             messages={fridayMessages}
             setMessages={setFridayMessages}
-            workouts={workouts}
             userProfile={userProfile}
-            nutrition={nutrition}
           />
         );
       case 'settings':
         return (
-          <Settings
+          <SettingsPage
             userProfile={userProfile}
-            setUserProfile={setUserProfile}
+            setUserProfile={setUserProfile as any}
             setTab={setCurrentTab}
             onResetOnboarding={handleResetOnboarding}
           />
         );
       default:
-        return (
-          <Dashboard
-            userProfile={userProfile}
-            dailyStats={dailyStats}
-            tasks={tasks}
-            workouts={workouts}
-            nutrition={nutrition}
-            onToggleTask={handleToggleTask}
-            setTab={setCurrentTab}
-            onAddMealClick={handleAddMealTransition}
-            onAddWater={handleAddWater}
-          />
-        );
+        return null;
     }
   };
-
-  if (!isOnboarded) {
-    return <Onboarding onComplete={handleOnboardingComplete} />;
-  }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex font-sans select-none antialiased">
@@ -586,16 +327,15 @@ export default function App() {
       <Sidebar 
         currentTab={currentTab} 
         setTab={setCurrentTab} 
-        streakDays={dailyStats.streakDays} 
+        streakDays={1} 
       />
 
-      {/* Main Container Shell */}
+      {/* Main Shell */}
       <div className="flex-1 flex flex-col min-w-0 md:pl-64 pb-16 md:pb-0 min-h-screen">
         <Header 
           currentTab={currentTab} 
           userName={userProfile.name} 
-          userGoal={userProfile.fitnessGoal} 
-          userPhoto={userPhoto}
+          userGoal={userProfile.goal.replace('_', ' ')} 
           setTab={setCurrentTab} 
         />
         

@@ -5,22 +5,18 @@ import { Bot, Sparkles, MessageSquare } from 'lucide-react';
 
 interface FridayInsightCardProps {
   onAskFriday: () => void;
-  insight?: string;
+  insight: string;
 }
 
 export const FridayInsightCard: React.FC<FridayInsightCardProps> = ({
   onAskFriday,
-  insight = "Your workout is complete, but you're currently 54g short of your protein target. I'd prioritize a high-protein dinner tonight."
+  insight
 }) => {
   return (
     <Card 
-      className="p-5 relative overflow-hidden bg-gradient-to-br from-zinc-900 to-zinc-950 border-cyan-500/20 shadow-xl shadow-cyan-950/5"
+      className="p-5 relative overflow-hidden bg-gradient-to-br from-zinc-900 to-zinc-950 border-cyan-500/20 shadow-xl"
       hoverEffect={true}
     >
-      {/* Background HUD elements */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
-      <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl pointer-events-none" />
-      
       <div className="relative z-10 flex flex-col justify-between h-full">
         <div>
           {/* Header */}
@@ -30,18 +26,18 @@ export const FridayInsightCard: React.FC<FridayInsightCardProps> = ({
                 <Bot className="w-4 h-4 animate-pulse" />
               </div>
               <div>
-                <h3 className="text-xs font-bold text-white uppercase tracking-widest">FRIDAY Tactical Insight</h3>
-                <span className="text-[8px] text-cyan-400 font-bold uppercase tracking-widest">Cognitive Suggestion</span>
+                <h3 className="text-xs font-bold text-white uppercase tracking-widest">FRIDAY Tactical AI</h3>
+                <span className="text-[8px] text-cyan-400 font-bold uppercase tracking-widest">Active Coach</span>
               </div>
             </div>
             <div className="flex items-center gap-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded px-1.5 py-0.5 text-[9px] font-semibold">
               <Sparkles className="w-3 h-3" />
-              <span>OPTIMIZING</span>
+              <span>ONLINE</span>
             </div>
           </div>
 
           {/* AI Response Text */}
-          <div className="my-3.5 pl-3.5 border-l-2 border-cyan-500 bg-zinc-900/30 py-2 rounded-r-lg">
+          <div className="my-3 pl-3 border-l-2 border-cyan-500 bg-zinc-900/30 py-2.5 rounded-r-lg">
             <p className="text-xs text-zinc-300 leading-relaxed font-medium">
               "{insight}"
             </p>
@@ -49,7 +45,7 @@ export const FridayInsightCard: React.FC<FridayInsightCardProps> = ({
         </div>
 
         {/* Call to action button */}
-        <div className="mt-5">
+        <div className="mt-4">
           <Button 
             variant="friday" 
             onClick={onAskFriday}
@@ -57,7 +53,7 @@ export const FridayInsightCard: React.FC<FridayInsightCardProps> = ({
           >
             <span className="flex items-center gap-2">
               <MessageSquare className="w-4 h-4" />
-              Initiate Tactical Query
+              Consult FRIDAY
             </span>
           </Button>
         </div>

@@ -5,75 +5,38 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
-import { Play, Square, Plus, Dumbbell, Timer, ArrowLeft, CheckCircle, Camera } from 'lucide-react';
-import { Workout as WorkoutType, Exercise, WorkoutSet } from '../types';
+import { Dumbbell, Timer, ArrowLeft, CheckCircle, Camera, Plus, Play, Pause } from 'lucide-react';
+import { WorkoutPlan, WorkoutSession, WorkoutExercise, WorkoutSet } from '../types';
 
 interface WorkoutProps {
-  workouts: WorkoutType[];
-  setWorkouts: React.Dispatch<React.SetStateAction<WorkoutType[]>>;
-  onCompleteWorkout: () => void;
+  plan: WorkoutPlan | null;
+  activeSession: WorkoutSession | null;
+  onUpdateSession: (session: WorkoutSession) => void;
+  onCompleteSession: (session: WorkoutSession) => void;
   setTab: (tab: string) => void;
 }
 
 export const Workout: React.FC<WorkoutProps> = ({
-  workouts,
-  setWorkouts,
-  onCompleteWorkout,
+  plan,
+  activeSession,
+  onUpdateSession,
+  onCompleteSession,
   setTab
 }) => {
-  const currentWorkout = workouts[0];
+  const [selectedDayIdx, setSelectedDayIdx] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const [activeCameraExercise, setActiveCameraExercise] = useState<WorkoutExercise | null>(null);
+
+  // New exercise inputs
   const [newExerciseName, setNewExerciseName] = useState('');
   const [newExerciseTarget, setNewExerciseTarget] = useState('3 sets of 10 reps');
   const [newExerciseNotes, setNewExerciseNotes] = useState('');
 
-  // Active Timer state
-  const [timerSeconds, setTimerSeconds] = useState(90);
+  // Active Rest Timer
+  const [timerSeconds, setTimerSeconds] = useState(60);
+  const [timerMax, setTimerMax] = useState(60);
   const [timerActive, setTimerActive] = useState(false);
-  const [timerMax, setTimerMax] = useState(90);
-
-  const handleLogCompletedReps = (exerciseId: string, reps: number) => {
-    setWorkouts(prev => prev.map(w => {
-      if (w.id === currentWorkout.id) {
-        return {
-          ...w,
-          exercises: w.exercises.map(ex => {
-            if (ex.id === exerciseId) {
-              let setCompleted = false;
-              const updatedSets = ex.sets.map(s => {
-                if (!s.completed && !setCompleted) {
-                  setCompleted = true;
-                  return { ...s, reps: reps, completed: true };
-                }
-                return s;
-              });
-
-              if (!setCompleted) {
-                const newSet: WorkoutSet = {
-                  id: `set-cam-${Date.now()}`,
-                  weight: ex.sets[ex.sets.length - 1]?.weight || 40,
-                  reps: reps,
-                  completed: true
-                };
-                return {
-                  ...ex,
-                  sets: [...ex.sets, newSet]
-                };
-              }
-
-              return {
-                ...ex,
-                sets: updatedSets
-              };
-            }
-            return ex;
-          })
-        };
-      }
-      return w;
-    }));
-  };
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -83,7 +46,6 @@ export const Workout: React.FC<WorkoutProps> = ({
       }, 1000);
     } else if (timerSeconds === 0) {
       setTimerActive(false);
-      // Play a high-tech synthesized notification sound or trigger flash
       if (typeof window !== 'undefined' && 'vibrate' in navigator) {
         navigator.vibrate([100, 50, 100]);
       }
@@ -91,154 +53,141 @@ export const Workout: React.FC<WorkoutProps> = ({
     return () => clearInterval(interval);
   }, [timerActive, timerSeconds]);
 
-  const toggleTimer = () => {
-    setTimerActive(!timerActive);
-  };
-
   const resetTimer = (secs: number) => {
     setTimerMax(secs);
     setTimerSeconds(secs);
     setTimerActive(false);
   };
 
+  const currentDay = plan?.days[selectedDayIdx] || null;
+
+  // Derive active exercise list from session if running, or default plan day
+  const currentExercises: WorkoutExercise[] = activeSession?.exercises || currentDay?.exercises || [];
+
   const handleToggleSet = (exerciseId: string, setId: string) => {
-    setWorkouts(prev => prev.map(w => {
-      if (w.id === currentWorkout.id) {
-        return {
-          ...w,
-          exercises: w.exercises.map(ex => {
-            if (ex.id === exerciseId) {
-              const updatedSets = ex.sets.map(s => {
-                if (s.id === setId) {
-                  // If completing, we could optionally start the rest timer automatically
-                  if (!s.completed) {
-                    resetTimer(timerMax);
-                    setTimerActive(true);
-                  }
-                  return { ...s, completed: !s.completed };
-                }
-                return s;
-              });
-              return { ...ex, sets: updatedSets };
+    if (!activeSession) return;
+
+    const updatedExercises = activeSession.exercises.map(ex => {
+      if (ex.id === exerciseId) {
+        const updatedSets = ex.sets.map(s => {
+          if (s.id === setId) {
+            const nextCompleted = !s.completed;
+            if (nextCompleted) {
+              resetTimer(ex.restSeconds || 60);
+              setTimerActive(true);
             }
-            return ex;
-          })
-        };
+            return {
+              ...s,
+              completed: nextCompleted,
+              completedAt: nextCompleted ? new Date().toISOString() : undefined
+            };
+          }
+          return s;
+        });
+        return { ...ex, sets: updatedSets };
       }
-      return w;
-    }));
+      return ex;
+    });
+
+    onUpdateSession({
+      ...activeSession,
+      exercises: updatedExercises
+    });
   };
 
-  const handleUpdateSet = (exerciseId: string, setId: string, field: 'weight' | 'reps', value: number) => {
-    setWorkouts(prev => prev.map(w => {
-      if (w.id === currentWorkout.id) {
+  const handleUpdateSet = (exerciseId: string, setId: string, field: 'weightKg' | 'reps', value: number) => {
+    if (!activeSession) return;
+
+    const updatedExercises = activeSession.exercises.map(ex => {
+      if (ex.id === exerciseId) {
         return {
-          ...w,
-          exercises: w.exercises.map(ex => {
-            if (ex.id === exerciseId) {
-              return {
-                ...ex,
-                sets: ex.sets.map(s => {
-                  if (s.id === setId) {
-                    return { ...s, [field]: value };
-                  }
-                  return s;
-                })
-              };
-            }
-            return ex;
-          })
+          ...ex,
+          sets: ex.sets.map(s => s.id === setId ? { ...s, [field]: value } : s)
         };
       }
-      return w;
-    }));
+      return ex;
+    });
+
+    onUpdateSession({
+      ...activeSession,
+      exercises: updatedExercises
+    });
   };
 
   const handleAddSet = (exerciseId: string) => {
-    setWorkouts(prev => prev.map(w => {
-      if (w.id === currentWorkout.id) {
-        return {
-          ...w,
-          exercises: w.exercises.map(ex => {
-            if (ex.id === exerciseId) {
-              // Find average of existing sets for defaults
-              const lastSet = ex.sets[ex.sets.length - 1];
-              const defaultWeight = lastSet ? lastSet.weight : 50;
-              const defaultReps = lastSet ? lastSet.reps : 10;
-              const newSet: WorkoutSet = {
-                id: `set-${Date.now()}`,
-                weight: defaultWeight,
-                reps: defaultReps,
-                completed: false
-              };
-              return {
-                ...ex,
-                sets: [...ex.sets, newSet]
-              };
-            }
-            return ex;
-          })
+    if (!activeSession) return;
+
+    const updatedExercises = activeSession.exercises.map(ex => {
+      if (ex.id === exerciseId) {
+        const lastSet = ex.sets[ex.sets.length - 1];
+        const newSet: WorkoutSet = {
+          id: `set-${Date.now()}`,
+          setNumber: ex.sets.length + 1,
+          weightKg: lastSet ? lastSet.weightKg : 10,
+          reps: lastSet ? lastSet.reps : 10,
+          completed: false
         };
+        return { ...ex, sets: [...ex.sets, newSet] };
       }
-      return w;
-    }));
+      return ex;
+    });
+
+    onUpdateSession({
+      ...activeSession,
+      exercises: updatedExercises
+    });
   };
 
   const handleDeleteSet = (exerciseId: string, setId: string) => {
-    setWorkouts(prev => prev.map(w => {
-      if (w.id === currentWorkout.id) {
+    if (!activeSession) return;
+
+    const updatedExercises = activeSession.exercises.map(ex => {
+      if (ex.id === exerciseId) {
         return {
-          ...w,
-          exercises: w.exercises.map(ex => {
-            if (ex.id === exerciseId) {
-              return {
-                ...ex,
-                sets: ex.sets.filter(s => s.id !== setId)
-              };
-            }
-            return ex;
-          })
+          ...ex,
+          sets: ex.sets.filter(s => s.id !== setId)
         };
       }
-      return w;
-    }));
+      return ex;
+    });
+
+    onUpdateSession({
+      ...activeSession,
+      exercises: updatedExercises
+    });
   };
 
   const handleDeleteExercise = (exerciseId: string) => {
-    setWorkouts(prev => prev.map(w => {
-      if (w.id === currentWorkout.id) {
-        return {
-          ...w,
-          exercises: w.exercises.filter(ex => ex.id !== exerciseId)
-        };
-      }
-      return w;
-    }));
+    if (!activeSession) return;
+
+    onUpdateSession({
+      ...activeSession,
+      exercises: activeSession.exercises.filter(ex => ex.id !== exerciseId)
+    });
   };
 
   const handleAddExerciseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newExerciseName.trim()) return;
+    if (!newExerciseName.trim() || !activeSession) return;
 
-    const newEx: Exercise = {
+    const newEx: WorkoutExercise = {
       id: `ex-${Date.now()}`,
+      exerciseId: `custom-${Date.now()}`,
       name: newExerciseName,
+      muscleGroups: ['CHEST'],
+      targetSets: 3,
       targetReps: newExerciseTarget,
+      restSeconds: 60,
       notes: newExerciseNotes,
       sets: [
-        { id: `s-${Date.now()}-1`, weight: 40, reps: 10, completed: false }
+        { id: `s-${Date.now()}-1`, setNumber: 1, weightKg: 10, reps: 10, completed: false }
       ]
     };
 
-    setWorkouts(prev => prev.map(w => {
-      if (w.id === currentWorkout.id) {
-        return {
-          ...w,
-          exercises: [...w.exercises, newEx]
-        };
-      }
-      return w;
-    }));
+    onUpdateSession({
+      ...activeSession,
+      exercises: [...activeSession.exercises, newEx]
+    });
 
     setNewExerciseName('');
     setNewExerciseTarget('3 sets of 10 reps');
@@ -246,87 +195,47 @@ export const Workout: React.FC<WorkoutProps> = ({
     setShowAddModal(false);
   };
 
-  // Calculations for current progress
-  const totalExercises = currentWorkout?.exercises.length || 0;
-  const completedExercises = currentWorkout?.exercises.filter(ex => 
-    ex.sets.length > 0 && ex.sets.every(s => s.completed)
-  ).length || 0;
+  const handleCameraLogReps = (exerciseId: string, reps: number) => {
+    if (!activeSession) return;
 
-  const progressPercentage = totalExercises > 0 
-    ? Math.round((completedExercises / totalExercises) * 100) 
-    : 0;
+    const updatedExercises = activeSession.exercises.map(ex => {
+      if (ex.id === exerciseId) {
+        let setMarked = false;
+        const updatedSets = ex.sets.map(s => {
+          if (!s.completed && !setMarked) {
+            setMarked = true;
+            return { ...s, reps, completed: true, completedAt: new Date().toISOString() };
+          }
+          return s;
+        });
 
-  const formatTime = (totalSecs: number) => {
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+        if (!setMarked) {
+          updatedSets.push({
+            id: `set-cam-${Date.now()}`,
+            setNumber: updatedSets.length + 1,
+            weightKg: ex.sets[ex.sets.length - 1]?.weightKg || 10,
+            reps,
+            completed: true,
+            completedAt: new Date().toISOString()
+          });
+        }
+        return { ...ex, sets: updatedSets };
+      }
+      return ex;
+    });
+
+    onUpdateSession({
+      ...activeSession,
+      exercises: updatedExercises
+    });
+
+    setIsCameraActive(false);
   };
 
-  if (!currentWorkout) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in px-4">
-        <div className="w-16 h-16 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500 flex items-center justify-center mb-6 shadow-md">
-          <Dumbbell className="w-8 h-8 text-cyan-500 animate-pulse" />
-        </div>
-        <h2 className="text-xl font-black text-white uppercase tracking-wider">No Active Workout</h2>
-        <p className="text-zinc-400 max-w-sm text-xs mt-2 leading-relaxed">
-          Please configure your goals and available equipment inside Settings to automatically generate your custom training plan.
-        </p>
-        <div className="mt-8">
-          <Button variant="primary" onClick={() => setTab('settings')}>
-            Configure Settings
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (currentWorkout?.completed) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in px-4">
-        <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-6 shadow-lg shadow-emerald-950/20">
-          <CheckCircle className="w-8 h-8" />
-        </div>
-        <h2 className="text-xl font-black text-white uppercase tracking-wider">Workout Completed!</h2>
-        <p className="text-zinc-400 max-w-sm text-xs mt-2 leading-relaxed">
-          Excellent training today! Your stats have been saved and logged to your progress history.
-        </p>
-        <div className="flex gap-4 mt-8">
-          <Button variant="outline" onClick={() => setTab('dashboard')}>
-            Go to Dashboard
-          </Button>
-          <Button variant="primary" onClick={() => {
-            // Restart workout demo
-            setWorkouts(prev => prev.map(w => {
-              if (w.id === currentWorkout.id) {
-                return {
-                  ...w,
-                  completed: false,
-                  exercises: w.exercises.map(ex => ({
-                    ...ex,
-                    sets: ex.sets.map(s => ({ ...s, completed: false }))
-                  }))
-                };
-              }
-              return w;
-            }));
-          }}>
-            Restart Workout
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (isCameraActive) {
-    return (
-      <WorkoutCamera 
-        currentWorkout={currentWorkout} 
-        onLogCompletedReps={handleLogCompletedReps} 
-        onClose={() => setIsCameraActive(false)} 
-      />
-    );
-  }
+  const totalExercises = currentExercises.length;
+  const completedExercises = currentExercises.filter(ex => 
+    ex.sets.length > 0 && ex.sets.every(s => s.completed)
+  ).length;
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -335,182 +244,173 @@ export const Workout: React.FC<WorkoutProps> = ({
         <div>
           <button 
             onClick={() => setTab('dashboard')} 
-            className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-white uppercase tracking-wider mb-2 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-white uppercase tracking-wider mb-2"
           >
             <ArrowLeft className="w-4 h-4" /> Dashboard
           </button>
-          <h1 className="text-xl font-black text-white uppercase tracking-tight">{currentWorkout?.name || "Active Workout"}</h1>
+          <h1 className="text-xl font-black text-white uppercase tracking-tight">
+            {activeSession ? activeSession.dayName : (currentDay ? currentDay.dayName : 'Workout Session')}
+          </h1>
           <p className="text-xs text-zinc-400 mt-1">
-            Target duration: <span className="text-cyan-400 font-bold">{currentWorkout?.durationMinutes} minutes</span> • Muscle groups engaged: Chest, Shoulders, Triceps
+            {plan ? `${plan.name} — ${completedExercises}/${totalExercises} Exercises Completed` : 'No active workout plan'}
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2.5 w-full sm:w-auto shrink-0">
-          <Button 
-            variant="outline" 
-            onClick={() => setIsCameraActive(true)} 
-            className="w-full sm:w-auto text-cyan-400 hover:text-cyan-300 border-cyan-500/20 hover:bg-cyan-500/5 h-10"
-          >
-            <span className="flex items-center gap-2 uppercase text-xs tracking-wider font-bold">
-              <Camera className="w-4 h-4" /> Open Camera Tracker
-            </span>
-          </Button>
-
-          <Button variant="primary" onClick={onCompleteWorkout} className="w-full sm:w-auto h-10">
-            <span className="flex items-center gap-2 uppercase text-xs tracking-wider">
-              ✓ Complete Workout
-            </span>
-          </Button>
-        </div>
-      </div>
-
-      {/* Main HUD: Active metrics, Timer */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Progress Tracker Card */}
-        <Card className="p-5 bg-zinc-950/40 border-zinc-850 flex flex-col justify-between" hoverEffect={false}>
-          <div>
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block mb-2">WORKOUT PROGRESS</span>
-            <div className="flex items-baseline justify-between mb-3">
-              <span className="text-3xl font-black text-white">{completedExercises} <span className="text-sm font-semibold text-zinc-400">/ {totalExercises}</span></span>
-              <span className="text-xs text-cyan-400 font-mono font-bold">{progressPercentage}% COMPLETED</span>
-            </div>
-            
-            <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden border border-zinc-950">
-              <div 
-                className="h-full bg-cyan-500 rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(6,182,212,0.4)]"
-                style={{ width: `${progressPercentage}%` }}
-              />
-            </div>
-          </div>
-          
-          <div className="text-[10px] text-zinc-500 font-medium bg-zinc-900/30 p-2 border border-zinc-850/60 rounded mt-4">
-            Complete your exercises to finish today's customized training program.
-          </div>
-        </Card>
- 
-        {/* Tactical Rest Timer */}
-        <Card className="p-5 bg-zinc-950/40 border-zinc-850 lg:col-span-2 flex flex-col sm:flex-row items-center gap-6" hoverEffect={false}>
-          <div className="flex-1 text-center sm:text-left">
-            <div className="flex items-center justify-center sm:justify-start gap-2 text-zinc-400 mb-1">
-              <Timer className="w-4 h-4 text-cyan-400" />
-              <span className="text-xs font-bold uppercase tracking-wider">Rest Interval Timer</span>
-            </div>
-            <p className="text-[10px] text-zinc-500 max-w-xs mt-1">
-              Rest between sets to allow muscle recovery. Completing a set starts the timer automatically.
-            </p>
-            <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-4">
-              <button 
-                onClick={() => resetTimer(60)} 
-                className={`text-[10px] font-mono font-bold px-2 py-1 rounded transition-all duration-200 cursor-pointer ${timerMax === 60 ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30' : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400'}`}
-              >
-                60s
-              </button>
-              <button 
-                onClick={() => resetTimer(90)} 
-                className={`text-[10px] font-mono font-bold px-2 py-1 rounded transition-all duration-200 cursor-pointer ${timerMax === 90 ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30' : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400'}`}
-              >
-                90s
-              </button>
-              <button 
-                onClick={() => resetTimer(120)} 
-                className={`text-[10px] font-mono font-bold px-2 py-1 rounded transition-all duration-200 cursor-pointer ${timerMax === 120 ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30' : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400'}`}
-              >
-                120s
-              </button>
-            </div>
-          </div>
- 
-          <div className="flex flex-col items-center justify-center bg-zinc-900/60 border border-zinc-850 p-4 rounded-xl min-w-[140px]">
-            <span className={`text-3xl font-mono font-bold tracking-tight mb-2 ${timerActive ? 'text-cyan-400 animate-pulse' : 'text-zinc-300'}`}>
-              {formatTime(timerSeconds)}
-            </span>
-            <Button 
-              variant={timerActive ? 'outline' : 'secondary'} 
-              onClick={toggleTimer}
-              className="w-full h-8 text-[11px] font-bold uppercase tracking-wide"
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          {activeSession && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setActiveCameraExercise(currentExercises[0] || null);
+                setIsCameraActive(true);
+              }}
+              className="text-xs"
             >
-              <span className="flex items-center gap-1">
-                {timerActive ? <Square className="w-3 h-3 fill-white" /> : <Play className="w-3 h-3 fill-cyan-400" />}
-                {timerActive ? 'PAUSE TIMER' : 'START TIMER'}
-              </span>
+              <Camera className="w-4 h-4 mr-1.5 text-cyan-400" />
+              Camera View
             </Button>
-          </div>
-        </Card>
+          )}
+
+          {activeSession && !activeSession.completed && (
+            <Button 
+              variant="primary" 
+              size="sm"
+              onClick={() => onCompleteSession(activeSession)}
+              className="text-xs font-bold uppercase"
+            >
+              <CheckCircle className="w-4 h-4 mr-1.5" />
+              Complete Workout
+            </Button>
+          )}
+        </div>
       </div>
- 
-      {/* Exercise List */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center pb-2 border-b border-zinc-900">
-          <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">EXERCISE PLAN</span>
-          <Button variant="outline" size="sm" onClick={() => setShowAddModal(true)}>
-            <span className="flex items-center gap-1">
-              <Plus className="w-3.5 h-3.5" /> ADD CUSTOM EXERCISE
-            </span>
-          </Button>
+
+      {/* Day Selector if multiple plan days exist */}
+      {plan && plan.days.length > 1 && !activeSession && (
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {plan.days.map((d, idx) => (
+            <button
+              key={d.id}
+              onClick={() => setSelectedDayIdx(idx)}
+              className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all whitespace-nowrap cursor-pointer ${
+                selectedDayIdx === idx
+                  ? 'bg-cyan-500/20 border border-cyan-400 text-cyan-300'
+                  : 'bg-zinc-900/40 border border-zinc-850 text-zinc-400 hover:border-zinc-700'
+              }`}
+            >
+              {d.dayName}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Rest Timer HUD */}
+      <Card className="p-4 bg-zinc-950/40 border-zinc-850 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+            <Timer className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-[10px] text-zinc-500 font-mono font-bold uppercase block">REST COUNTDOWN TIMER</span>
+            <span className="text-2xl font-black text-white font-mono">{timerSeconds}s</span>
+          </div>
         </div>
 
-        {totalExercises === 0 ? (
-          <Card className="p-10 text-center border-dashed border-zinc-800" hoverEffect={false}>
-            <Dumbbell className="w-10 h-10 text-zinc-650 mx-auto mb-3" />
-            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Operational parameters dry</h3>
-            <p className="text-[10px] text-zinc-550 max-w-sm mx-auto mt-1">
-              No exercises registered for today's protocol. Hit 'Add Custom Exercise' above to queue biomechanic operations.
-            </p>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {currentWorkout.exercises.map((exercise, index) => (
-              <WorkoutExerciseCard
-                key={exercise.id}
-                exercise={exercise}
-                exerciseIndex={index}
-                onToggleSet={handleToggleSet}
-                onUpdateSet={handleUpdateSet}
-                onAddSet={handleAddSet}
-                onDeleteSet={handleDeleteSet}
-                onDeleteExercise={handleDeleteExercise}
-              />
-            ))}
-          </div>
+        <div className="flex items-center gap-2">
+          {[30, 60, 90, 120].map(sec => (
+            <button
+              key={sec}
+              onClick={() => resetTimer(sec)}
+              className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all ${
+                timerMax === sec ? 'bg-cyan-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-white'
+              }`}
+            >
+              {sec}s
+            </button>
+          ))}
+          <Button
+            variant={timerActive ? 'danger' : 'outline'}
+            size="sm"
+            onClick={() => setTimerActive(!timerActive)}
+            className="text-xs"
+          >
+            {timerActive ? <Pause className="w-3.5 h-3.5 mr-1" /> : <Play className="w-3.5 h-3.5 mr-1" />}
+            {timerActive ? 'Pause' : 'Start'}
+          </Button>
+        </div>
+      </Card>
+
+      {/* Exercises Grid */}
+      <div className="space-y-4">
+        {currentExercises.map((exercise, index) => (
+          <WorkoutExerciseCard
+            key={exercise.id}
+            exercise={exercise}
+            exerciseIndex={index}
+            onToggleSet={handleToggleSet}
+            onUpdateSet={handleUpdateSet}
+            onAddSet={handleAddSet}
+            onDeleteSet={handleDeleteSet}
+            onDeleteExercise={handleDeleteExercise}
+          />
+        ))}
+
+        {activeSession && (
+          <Button
+            variant="outline"
+            onClick={() => setShowAddModal(true)}
+            className="w-full py-3 text-xs uppercase tracking-wider"
+          >
+            <Plus className="w-4 h-4 mr-1.5" /> Add Custom Exercise to Session
+          </Button>
         )}
       </div>
 
       {/* Add Custom Exercise Modal */}
-      <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Add Tactical Exercise">
-        <form onSubmit={handleAddExerciseSubmit} className="space-y-4">
-          <Input 
+      <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="ADD EXERCISE">
+        <form onSubmit={handleAddExerciseSubmit} className="space-y-4 pt-2">
+          <Input
             id="ex-name"
-            label="EXERCISE NAME"
+            label="Exercise Name"
             value={newExerciseName}
-            onChange={(e) => setNewExerciseName(e.target.value)}
-            placeholder="e.g. Lateral Raises, Pull Ups"
+            onChange={e => setNewExerciseName(e.target.value)}
+            placeholder="e.g. Incline Dumbbell Press"
             required
           />
-          <Input 
+          <Input
             id="ex-target"
-            label="TARGET STANDARD"
+            label="Target Sets & Reps"
             value={newExerciseTarget}
-            onChange={(e) => setNewExerciseTarget(e.target.value)}
-            placeholder="e.g. 3 sets of 12 reps"
+            onChange={e => setNewExerciseTarget(e.target.value)}
+            placeholder="e.g. 3 sets of 10 reps"
           />
-          <Input 
+          <Input
             id="ex-notes"
-            label="EXECUTION SUGGESTIONS"
+            label="Form Notes (Optional)"
             value={newExerciseNotes}
-            onChange={(e) => setNewExerciseNotes(e.target.value)}
-            placeholder="e.g. Focus on control, tempo focus"
+            onChange={e => setNewExerciseNotes(e.target.value)}
+            placeholder="e.g. Keep chest high, control eccentric"
           />
-          <div className="flex gap-3 justify-end pt-2">
-            <Button variant="ghost" type="button" onClick={() => setShowAddModal(false)}>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>
               Cancel
             </Button>
-            <Button variant="primary" type="submit">
-              Queue Exercise
+            <Button type="submit" variant="primary">
+              Add Exercise
             </Button>
           </div>
         </form>
       </Modal>
+
+      {/* Optical Camera View Modal */}
+      {isCameraActive && (
+        <WorkoutCamera
+          exercise={activeCameraExercise}
+          onLogCompletedReps={handleCameraLogReps}
+          onClose={() => setIsCameraActive(false)}
+        />
+      )}
     </div>
   );
 };

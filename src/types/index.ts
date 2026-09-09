@@ -1,101 +1,158 @@
-export interface UserPreferences {
-  coachingStyle: 'Supportive' | 'Balanced' | 'Direct' | 'Strict';
-  workoutDaysPerWeek: number;
-  preferredWorkoutTime: string;
-  targetWeight: number;
-}
+export type Goal = 
+  | 'FAT_LOSS' 
+  | 'GAIN_MUSCLE' 
+  | 'BODY_RECOMPOSITION' 
+  | 'STRENGTH' 
+  | 'GENERAL_FITNESS' 
+  | 'ENDURANCE';
+
+export type Sex = 'MALE' | 'FEMALE' | 'OTHER';
+
+export type ActivityLevel = 
+  | 'SEDENTARY' 
+  | 'LIGHTLY_ACTIVE' 
+  | 'MODERATELY_ACTIVE' 
+  | 'VERY_ACTIVE';
+
+export type TrainingExperience = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+
+export type TrainingEnvironment = 'HOME' | 'GYM' | 'OUTDOOR';
+
+export type DietPreference = 'STANDARD' | 'VEGETARIAN' | 'VEGAN' | 'KETO' | 'PALEO';
 
 export interface UserProfile {
   id: string;
   name: string;
   age: number;
-  sex: 'Male' | 'Female' | 'Other';
+  sex: Sex;
   height: number; // in cm
-  weight: number; // in kg (current weight)
-  currentWeight: number; // in kg (alias for consistency)
+  currentWeight: number; // in kg
   targetWeight: number; // in kg
-  goal: 'Fat Loss' | 'Muscle Gain' | 'Body Recomposition' | 'Strength' | 'General Fitness' | 'Endurance';
-  activityLevel: 'Sedentary' | 'Lightly Active' | 'Moderately Active' | 'Very Active';
-  trainingExperience: 'Beginner' | 'Intermediate' | 'Advanced';
-  trainingEnvironment: 'Gym' | 'Home';
-  equipment: string[];
-  dietPreference: 'Standard' | 'Vegetarian' | 'Vegan' | 'Keto' | 'Paleo';
+  goal: Goal;
+  activityLevel: ActivityLevel;
+  trainingExperience: TrainingExperience;
+  trainingEnvironment: TrainingEnvironment;
+  equipment: string[]; // e.g. [] for Home + No Equipment
+  availableWorkoutDays: string[]; // e.g. ['MON', 'WED', 'FRI']
+  preferredWorkoutDuration: number; // in minutes (e.g. 45)
+  dietPreference: DietPreference;
   foodPreferences: string[];
   allergies: string[];
-  exercisePreferences: {
-    liked: string[];
-    disliked: string[];
-  };
-  availableWorkoutDays: string[]; // e.g. ["Mon", "Wed", "Fri"]
-  workoutDuration: number; // in minutes
-  bodyPhoto: string | null;
-  preferences: UserPreferences;
-  // Backward compatibility fields
-  fitnessGoal: string;
-  workoutDaysPerWeek: number;
-  preferredWorkoutTime: string;
-  coachingStyle: 'Supportive' | 'Balanced' | 'Direct' | 'Strict';
+  intolerances: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface Task {
+export type MuscleGroup = 
+  | 'CHEST' 
+  | 'BACK' 
+  | 'SHOULDERS' 
+  | 'BICEPS' 
+  | 'TRICEPS' 
+  | 'LEGS' 
+  | 'CORE' 
+  | 'CARDIO';
+
+export type EquipmentType = 
+  | 'DUMBBELL' 
+  | 'BARBELL' 
+  | 'BENCH' 
+  | 'CABLE_MACHINE' 
+  | 'PULL_UP_BAR' 
+  | 'RESISTANCE_BANDS' 
+  | 'KETTLEBELL' 
+  | 'GYM_MACHINE' 
+  | 'SQUAT_RACK';
+
+export interface ExerciseDefinition {
   id: string;
-  title: string;
-  completed: boolean;
-  category: 'hydration' | 'workout' | 'nutrition' | 'steps' | 'sleep' | 'other';
-  value?: string;
-}
-
-export interface DailyStats {
-  score: number;
-  scoreBreakdown: {
-    workout: number; // out of 20
-    nutrition: number; // out of 30
-    hydration: number; // out of 15
-    steps: number; // out of 20
-    sleep: number; // out of 15
-  };
-  weight: number;
-  targetWeight: number;
-  streakDays: number;
-  weightChange: string; // e.g., "-1.8 kg"
+  name: string;
+  muscleGroups: MuscleGroup[];
+  equipmentRequired: EquipmentType[]; // empty means purely bodyweight
+  environments: TrainingEnvironment[];
+  difficulty: TrainingExperience;
+  instructions: string;
+  defaultReps: string;
+  defaultSets: number;
+  restSeconds: number;
 }
 
 export interface WorkoutSet {
   id: string;
-  weight: number; // in kg
+  setNumber: number;
+  weightKg: number;
   reps: number;
   completed: boolean;
+  completedAt?: string;
 }
 
-export interface Exercise {
+export interface WorkoutExercise {
   id: string;
+  exerciseId: string;
   name: string;
+  muscleGroups: MuscleGroup[];
+  targetSets: number;
+  targetReps: string;
+  restSeconds: number;
+  notes: string;
   sets: WorkoutSet[];
-  targetReps: string; // e.g. "3x8-10"
+}
+
+export interface WorkoutDay {
+  id: string;
+  dayName: string; // e.g. "Day 1 - Push"
+  focus: string;
+  exercises: WorkoutExercise[];
+}
+
+export interface WorkoutPlan {
+  id: string;
+  userId: string;
+  name: string;
+  goal: Goal;
+  environment: TrainingEnvironment;
+  equipment: string[];
+  createdAt: string;
+  days: WorkoutDay[];
+}
+
+export interface WorkoutSession {
+  id: string;
+  userId: string;
+  planId: string;
+  dayId: string;
+  dayName: string;
+  startedAt: string;
+  completedAt?: string;
+  completed: boolean;
+  exercises: WorkoutExercise[];
   notes?: string;
 }
 
-export interface Workout {
-  id: string;
-  name: string; // e.g., "Push Day"
-  durationMinutes: number;
-  exercises: Exercise[];
-  completed: boolean;
-  date: string; // YYYY-MM-DD
+export interface NutritionTargets {
+  bmr: number;
+  maintenanceCalories: number;
+  targetCalories: number;
+  proteinGrams: number;
+  carbsGrams: number;
+  fatGrams: number;
 }
 
 export interface MealItem {
+  id: string;
   name: string;
   calories: number;
-  protein: number; // in grams
-  carbs: number; // in grams
-  fat: number; // in grams
+  protein: number;
+  carbs: number;
+  fat: number;
 }
+
+export type MealType = 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
 
 export interface Meal {
   id: string;
-  name: string; // e.g., "Breakfast"
-  time: string; // e.g., "08:30"
+  name: string;
+  type: MealType;
   items: MealItem[];
   totalCalories: number;
   totalProtein: number;
@@ -109,31 +166,19 @@ export interface HydrationEntry {
   timestamp: string; // ISO string
 }
 
-export interface HydrationData {
+export interface DailyHydration {
+  date: string; // YYYY-MM-DD
   targetMl: number;
   consumedMl: number;
   entries: HydrationEntry[];
 }
 
-export interface Nutrition {
-  calories: {
-    current: number;
-    target: number;
-  };
-  protein: {
-    current: number;
-    target: number;
-  };
-  carbs: {
-    current: number;
-    target: number;
-  };
-  fat: {
-    current: number;
-    target: number;
-  };
-  waterIntakeLiters: number;
-  waterTargetLiters: number;
+export interface DailyTask {
+  id: string;
+  title: string;
+  category: 'workout' | 'nutrition' | 'hydration' | 'steps' | 'sleep' | 'other';
+  completed: boolean;
+  value?: string;
 }
 
 export interface Habit {
@@ -141,25 +186,29 @@ export interface Habit {
   name: string;
   icon: string;
   streak: number;
-  weeklyHistory: { [key: string]: boolean }; // keys: "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
+  weeklyHistory: { [key: string]: boolean }; // Mon - Sun
   currentCompleted: boolean;
 }
 
-export interface MeasurementHistory {
-  date: string;
-  value: number;
+export interface WeightRecord {
+  id: string;
+  date: string; // YYYY-MM-DD or formatted display
+  weightKg: number;
 }
 
-export interface ProgressMeasurement {
-  weightHistory: { date: string; value: number }[];
-  chest: MeasurementHistory[];
-  waist: MeasurementHistory[];
-  arms: MeasurementHistory[];
-  thighs: MeasurementHistory[];
-  strengthProgression: {
-    exerciseName: string;
-    history: { date: string; oneRepMax: number }[];
-  }[];
+export interface MeasurementRecord {
+  id: string;
+  date: string;
+  chestCm?: number;
+  waistCm?: number;
+  armsCm?: number;
+  thighsCm?: number;
+}
+
+export interface ProgressState {
+  weights: WeightRecord[];
+  measurements: MeasurementRecord[];
+  photoUrls: { id: string; date: string; url: string }[];
 }
 
 export interface FridayMessage {
@@ -167,5 +216,11 @@ export interface FridayMessage {
   sender: 'friday' | 'user';
   text: string;
   timestamp: string;
-  category?: 'alert' | 'info' | 'success' | 'workout' | 'nutrition';
+  category?: 'info' | 'workout' | 'nutrition' | 'alert' | 'system';
+}
+
+export interface FridayTool {
+  name: string;
+  description: string;
+  execute: (input: Record<string, unknown>) => Promise<unknown>;
 }

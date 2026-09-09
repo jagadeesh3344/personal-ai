@@ -6,6 +6,7 @@ interface ProgressBarProps {
   color?: 'cyan' | 'emerald' | 'amber' | 'indigo' | 'red';
   showLabel?: boolean;
   unit?: string;
+  className?: string;
 }
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({
@@ -13,7 +14,8 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   max,
   color = 'cyan',
   showLabel = false,
-  unit = ''
+  unit = '',
+  className = ''
 }) => {
   const percentage = Math.min(100, Math.max(0, max > 0 ? (value / max) * 100 : 0));
   
@@ -26,7 +28,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   };
 
   return (
-    <div className="w-full">
+    <div className={`w-full ${className}`}>
       {showLabel && (
         <div className="flex justify-between text-xs text-zinc-400 mb-1">
           <span>Progress</span>
