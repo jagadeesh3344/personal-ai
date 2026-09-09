@@ -95,7 +95,7 @@ export const Workout: React.FC<WorkoutProps> = ({
     });
   };
 
-  const handleUpdateSet = (exerciseId: string, setId: string, field: 'weightKg' | 'reps', value: number) => {
+  const handleUpdateSet = (exerciseId: string, setId: string, field: 'weightKg' | 'reps' | 'durationSeconds' | 'resistanceLevel', value: any) => {
     if (!activeSession) return;
 
     const updatedExercises = activeSession.exercises.map(ex => {

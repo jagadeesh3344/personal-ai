@@ -1,4 +1,5 @@
 import { Equipment, TrainingEnvironment, TrainingExperience } from '../../../types/profile';
+import { TrackingType } from '../../../types';
 
 export type MuscleGroup =
   | "CHEST"
@@ -18,10 +19,12 @@ export interface Exercise {
   muscleGroups: MuscleGroup[];
   difficulty: TrainingExperience;
   instructions: string;
+  trackingType?: TrackingType;
   defaultReps?: string;
   defaultSets?: number;
   restSeconds?: number;
 }
+
 
 export const EXERCISES: Exercise[] = [
   // --- BODYWEIGHT / NO EQUIPMENT (HOME, GYM, OUTDOOR) ---

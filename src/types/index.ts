@@ -13,6 +13,8 @@ export type MuscleGroup =
 
 export type EquipmentType = Equipment;
 
+export type TrackingType = 'REPS_ONLY' | 'WEIGHT_AND_REPS' | 'TIME_SECONDS' | 'REPS_RESISTANCE';
+
 export interface ExerciseDefinition {
   id: string;
   name: string;
@@ -21,6 +23,7 @@ export interface ExerciseDefinition {
   muscleGroups: MuscleGroup[];
   difficulty: string;
   instructions: string;
+  trackingType?: TrackingType;
 }
 
 export interface WorkoutSet {
@@ -28,6 +31,8 @@ export interface WorkoutSet {
   setNumber: number;
   weightKg: number;
   reps: number;
+  durationSeconds?: number;
+  resistanceLevel?: string;
   completed: boolean;
   completedAt?: string;
 }
@@ -41,6 +46,7 @@ export interface WorkoutExercise {
   targetReps: string;
   restSeconds: number;
   notes: string;
+  trackingType?: TrackingType;
   sets: WorkoutSet[];
 }
 

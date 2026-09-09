@@ -7,7 +7,7 @@ interface WorkoutExerciseCardProps {
   exercise: WorkoutExercise;
   exerciseIndex: number;
   onToggleSet: (exerciseId: string, setId: string) => void;
-  onUpdateSet: (exerciseId: string, setId: string, field: 'weightKg' | 'reps', value: number) => void;
+  onUpdateSet: (exerciseId: string, setId: string, field: 'weightKg' | 'reps' | 'durationSeconds' | 'resistanceLevel', value: any) => void;
   onAddSet: (exerciseId: string) => void;
   onDeleteSet: (exerciseId: string, setId: string) => void;
   onDeleteExercise: (exerciseId: string) => void;
@@ -25,6 +25,31 @@ export const WorkoutExerciseCard: React.FC<WorkoutExerciseCardProps> = ({
   const completedSets = exercise.sets.filter(s => s.completed).length;
   const totalSets = exercise.sets.length;
   const isCompleted = completedSets === totalSets && totalSets > 0;
+
+  const effectiveTrackingType = (() => {
+    if (exercise.trackingType) return exercise.trackingType;
+    const name = exercise.name.toLowerCase();
+    const reps = (exercise.targetReps || '').toLowerCase();
+    if (name.includes('plank') || name.includes('climber') || reps.includes('sec')) {
+      return 'TIME_SECONDS';
+    }
+    if (name.includes('band')) {
+      return 'REPS_RESISTANCE';
+    }
+    if (
+      name.includes('push-up') ||
+      name.includes('bodyweight') ||
+      name.includes('pull-up') ||
+      name.includes('chin-up') ||
+      name.includes('dip') ||
+      name.includes('crunch') ||
+      name.includes('lunge') ||
+      name.includes('glute bridge')
+    ) {
+      return 'REPS_ONLY';
+    }
+    return 'WEIGHT_AND_REPS';
+  })();
 
   return (
     <Card 
@@ -64,10 +89,17 @@ export const WorkoutExerciseCard: React.FC<WorkoutExerciseCardProps> = ({
       </div>
 
       {/* Target parameters badge */}
-      <div className="mb-4 flex items-center gap-1.5 bg-zinc-900/50 border border-zinc-850 p-2 rounded-lg text-xs">
-        <HelpCircle className="w-3.5 h-3.5 text-cyan-500" />
-        <span className="text-zinc-400">Target Standard:</span>
-        <span className="text-zinc-200 font-bold font-mono">{exercise.targetReps}</span>
+      <div className="mb-4 flex items-center justify-between bg-zinc-900/50 border border-zinc-850 p-2 rounded-lg text-xs">
+        <div className="flex items-center gap-1.5">
+          <HelpCircle className="w-3.5 h-3.5 text-cyan-500" />
+          <span className="text-zinc-400">Target Standard:</span>
+          <span className="text-zinc-200 font-bold font-mono">{exercise.targetReps}</span>
+        </div>
+        <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-zinc-800 text-cyan-400 border border-zinc-700">
+          {effectiveTrackingType === 'TIME_SECONDS' ? 'Timed' : 
+           effectiveTrackingType === 'REPS_ONLY' ? 'Bodyweight / Reps' :
+           effectiveTrackingType === 'REPS_RESISTANCE' ? 'Band / Resistance' : 'Weight + Reps'}
+        </span>
       </div>
 
       {/* Sets Grid */}
@@ -86,29 +118,83 @@ export const WorkoutExerciseCard: React.FC<WorkoutExerciseCardProps> = ({
               SET {set.setNumber || setIdx + 1}
             </div>
 
-            {/* Weight Input */}
-            <div className="col-span-3 flex items-center gap-1">
-              <input
-                type="number"
-                value={set.weightKg ?? 0}
-                onChange={(e) => onUpdateSet(exercise.id, set.id, 'weightKg', parseFloat(e.target.value) || 0)}
-                disabled={set.completed}
-                className="w-full h-8 bg-zinc-950/80 border border-zinc-800 focus:border-cyan-500 text-center rounded text-xs font-bold text-white outline-none disabled:opacity-50 disabled:bg-transparent"
-              />
-              <span className="text-[10px] text-zinc-500">kg</span>
-            </div>
+            {/* Inputs based on trackingType */}
+            {effectiveTrackingType === 'TIME_SECONDS' && (
+              <div className="col-span-6 flex items-center gap-1.5">
+                <input
+                  type="number"
+                  value={set.durationSeconds ?? set.reps ?? 45}
+                  onChange={(e) => onUpdateSet(exercise.id, set.id, 'durationSeconds', parseInt(e.target.value, 10) || 0)}
+                  disabled={set.completed}
+                  className="w-full h-8 bg-zinc-950/80 border border-zinc-800 focus:border-cyan-500 text-center rounded text-xs font-bold text-white outline-none disabled:opacity-50 disabled:bg-transparent"
+                />
+                <span className="text-[10px] text-zinc-500 font-mono">sec</span>
+              </div>
+            )}
 
-            {/* Reps Input */}
-            <div className="col-span-3 flex items-center gap-1">
-              <input
-                type="number"
-                value={set.reps || ''}
-                onChange={(e) => onUpdateSet(exercise.id, set.id, 'reps', parseInt(e.target.value, 10) || 0)}
-                disabled={set.completed}
-                className="w-full h-8 bg-zinc-950/80 border border-zinc-800 focus:border-cyan-500 text-center rounded text-xs font-bold text-white outline-none disabled:opacity-50 disabled:bg-transparent"
-              />
-              <span className="text-[10px] text-zinc-500">reps</span>
-            </div>
+            {effectiveTrackingType === 'REPS_ONLY' && (
+              <div className="col-span-6 flex items-center gap-1.5">
+                <input
+                  type="number"
+                  value={set.reps || ''}
+                  onChange={(e) => onUpdateSet(exercise.id, set.id, 'reps', parseInt(e.target.value, 10) || 0)}
+                  disabled={set.completed}
+                  className="w-full h-8 bg-zinc-950/80 border border-zinc-800 focus:border-cyan-500 text-center rounded text-xs font-bold text-white outline-none disabled:opacity-50 disabled:bg-transparent"
+                />
+                <span className="text-[10px] text-zinc-500 font-mono">reps</span>
+              </div>
+            )}
+
+            {effectiveTrackingType === 'REPS_RESISTANCE' && (
+              <>
+                <div className="col-span-3 flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={set.resistanceLevel || 'Medium'}
+                    onChange={(e) => onUpdateSet(exercise.id, set.id, 'resistanceLevel', e.target.value)}
+                    disabled={set.completed}
+                    placeholder="Band"
+                    className="w-full h-8 bg-zinc-950/80 border border-zinc-800 focus:border-cyan-500 text-center rounded text-xs font-bold text-white outline-none disabled:opacity-50 disabled:bg-transparent"
+                  />
+                  <span className="text-[10px] text-zinc-500">res</span>
+                </div>
+                <div className="col-span-3 flex items-center gap-1">
+                  <input
+                    type="number"
+                    value={set.reps || ''}
+                    onChange={(e) => onUpdateSet(exercise.id, set.id, 'reps', parseInt(e.target.value, 10) || 0)}
+                    disabled={set.completed}
+                    className="w-full h-8 bg-zinc-950/80 border border-zinc-800 focus:border-cyan-500 text-center rounded text-xs font-bold text-white outline-none disabled:opacity-50 disabled:bg-transparent"
+                  />
+                  <span className="text-[10px] text-zinc-500 font-mono">reps</span>
+                </div>
+              </>
+            )}
+
+            {effectiveTrackingType === 'WEIGHT_AND_REPS' && (
+              <>
+                <div className="col-span-3 flex items-center gap-1">
+                  <input
+                    type="number"
+                    value={set.weightKg ?? 0}
+                    onChange={(e) => onUpdateSet(exercise.id, set.id, 'weightKg', parseFloat(e.target.value) || 0)}
+                    disabled={set.completed}
+                    className="w-full h-8 bg-zinc-950/80 border border-zinc-800 focus:border-cyan-500 text-center rounded text-xs font-bold text-white outline-none disabled:opacity-50 disabled:bg-transparent"
+                  />
+                  <span className="text-[10px] text-zinc-500 font-mono">kg</span>
+                </div>
+                <div className="col-span-3 flex items-center gap-1">
+                  <input
+                    type="number"
+                    value={set.reps || ''}
+                    onChange={(e) => onUpdateSet(exercise.id, set.id, 'reps', parseInt(e.target.value, 10) || 0)}
+                    disabled={set.completed}
+                    className="w-full h-8 bg-zinc-950/80 border border-zinc-800 focus:border-cyan-500 text-center rounded text-xs font-bold text-white outline-none disabled:opacity-50 disabled:bg-transparent"
+                  />
+                  <span className="text-[10px] text-zinc-500 font-mono">reps</span>
+                </div>
+              </>
+            )}
 
             {/* Delete set button */}
             <div className="col-span-2 flex justify-center">
@@ -137,6 +223,7 @@ export const WorkoutExerciseCard: React.FC<WorkoutExerciseCardProps> = ({
           </div>
         ))}
       </div>
+
 
       {/* Card Actions */}
       <button

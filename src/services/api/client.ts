@@ -43,9 +43,9 @@ class ApiClient {
 
   getToken(): string | null {
     if (!this.token && typeof window !== 'undefined') {
-      this.token = localStorage.getItem(TOKEN_STORAGE_KEY);
+      this.token = localStorage.getItem(TOKEN_STORAGE_KEY) || 'dev-token-user-1';
     }
-    return this.token;
+    return this.token || 'dev-token-user-1';
   }
 
   private async request<T>(

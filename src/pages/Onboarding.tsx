@@ -116,7 +116,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     const finalEquipment: Equipment[] = hasNoEquipment ? ['NONE'] : (selectedEquipment.length > 0 ? selectedEquipment : ['NONE']);
 
     const profile: UserProfile = {
-      name: name.trim() || 'Operator',
+      name: name.trim() || 'Athlete',
       age: parseInt(age, 10) || 25,
       sex,
       heightCm: parseFloat(height) || 175,
@@ -202,17 +202,18 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         {step === 2 && (
           <div className="space-y-6 animate-fade-in">
             <div>
-              <h2 className="text-2xl font-black text-white uppercase tracking-tight">Biometric Telemetry</h2>
-              <p className="text-xs text-zinc-400 mt-1">Accurate parameters ensure safe and realistic calorie/macro models.</p>
+              <h2 className="text-2xl font-black text-white uppercase tracking-tight">Biometric & Body Data</h2>
+              <p className="text-xs text-zinc-400 mt-1">Accurate parameters ensure safe and realistic calorie and training models.</p>
             </div>
             <div className="space-y-4">
               <Input 
                 id="name" 
-                label="Full Name / Operator Code" 
+                label="Full Name" 
                 value={name} 
                 onChange={e => setName(e.target.value)} 
                 placeholder="Enter your name" 
               />
+
               <div className="grid grid-cols-2 gap-4">
                 <Input 
                   id="age" 

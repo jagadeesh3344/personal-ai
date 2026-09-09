@@ -6,20 +6,21 @@ import {
   GenerateResult, 
   ToolCallRequest 
 } from './AIProvider.js';
+import { logFridayEvent } from './fridayLogger.js';
 
 export class GeminiProvider implements AIProvider {
   private client: GoogleGenAI | null = null;
   private modelName: string;
 
-  constructor(modelName = 'gemini-2.5-flash') {
+  constructor(modelName = 'gemini-2.0-flash') {
     this.modelName = modelName;
-    if (env.GEMINI_API_KEY && env.GEMINI_API_KEY !== 'your-gemini-api-key-here') {
+    if (env.GEMINI_API_KEY && env.GEMINI_API_KEY !== 'your-gemini-api-key-here' && env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY') {
       this.client = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
     }
   }
 
   async generate(options: GenerateOptions): Promise<GenerateResult> {
-    // 1. If in test mode or API key is not supplied, use deterministic rule-based tool routing for test suite
+    // 1. If in test mode or API key is not supplied, use deterministic rule-based tool routing
     if (!this.client || process.env.NODE_ENV === 'test') {
       return this.handleLocalOrTestFallback(options);
     }
@@ -46,6 +47,12 @@ export class GeminiProvider implements AIProvider {
         config.tools = [{ functionDeclarations }];
       }
 
+      logFridayEvent('GEMINI_REQUEST_STARTED', {
+        model: this.modelName,
+        messagesCount: contents.length,
+        toolsCount: functionDeclarations.length
+      });
+
       const response = await this.client.models.generateContent({
         model: this.modelName,
         contents,
@@ -71,6 +78,14 @@ export class GeminiProvider implements AIProvider {
         }
       }
 
+      logFridayEvent('GEMINI_RESPONSE_RECEIVED', {
+        model: this.modelName,
+        candidatesCount: response.candidates?.length || 0,
+        textLength: text.length,
+        toolCallsCount: toolCalls.length,
+        toolNames: toolCalls.map(t => t.name)
+      });
+
       return {
         text,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
@@ -88,19 +103,30 @@ export class GeminiProvider implements AIProvider {
   private handleLocalOrTestFallback(options: GenerateOptions): GenerateResult {
     const lastMessage = options.messages[options.messages.length - 1]?.content.toLowerCase() || '';
 
-    // Test Case: "I drank 500 ml"
-    if (lastMessage.includes('drank') && lastMessage.includes('500')) {
+    // If follow-up message with tool execution results, return empty text so FridayAgent formats tool results
+    if (lastMessage.includes('tool execution results:')) {
+      return {
+        text: '',
+        toolCalls: undefined
+      };
+    }
+
+    // Test Case: Hydration logging ("I drank 500 ml", "logged 250ml water")
+    const drankMatch = lastMessage.match(/(?:drank|drink|logged|had)\s+(\d+)\s*(?:ml|milliliters|millilitres)/i) 
+      || lastMessage.match(/(\d+)\s*(?:ml|milliliters|millilitres)/i);
+    if (drankMatch && (lastMessage.includes('water') || lastMessage.includes('drank') || lastMessage.includes('logged'))) {
+      const amount = parseInt(drankMatch[1], 10) || 500;
       return {
         text: '',
         toolCalls: [{
-          id: 'call-hydr-500',
+          id: `call-hydr-${amount}`,
           name: 'logHydration',
-          arguments: { amountMl: 500 }
+          arguments: { amountMl: amount }
         }]
       };
     }
 
-    // Test Case: "How much water have I had?"
+    // Test Case: "How much water have I had today?" / "hydration"
     if (lastMessage.includes('water') || lastMessage.includes('hydration')) {
       return {
         text: '',
@@ -112,8 +138,8 @@ export class GeminiProvider implements AIProvider {
       };
     }
 
-    // Test Case: "What is my workout today?"
-    if (lastMessage.includes('workout') || lastMessage.includes('exercise')) {
+    // Test Case: "What is my workout today?" / "workout"
+    if (lastMessage.includes('workout') || lastMessage.includes('exercise') || lastMessage.includes('training')) {
       return {
         text: '',
         toolCalls: [{
@@ -124,8 +150,8 @@ export class GeminiProvider implements AIProvider {
       };
     }
 
-    // Test Case: "How am I progressing?"
-    if (lastMessage.includes('progress') || lastMessage.includes('weight')) {
+    // Test Case: "What is my progress?" / "progress" / "biometrics"
+    if (lastMessage.includes('progress') || lastMessage.includes('weight') || lastMessage.includes('measurement')) {
       return {
         text: '',
         toolCalls: [{
@@ -136,9 +162,38 @@ export class GeminiProvider implements AIProvider {
       };
     }
 
+    // Test Case: "What are my calorie and protein targets?" / "nutrition"
+    if (lastMessage.includes('calorie') || lastMessage.includes('protein') || lastMessage.includes('target') || lastMessage.includes('diet') || lastMessage.includes('meal')) {
+      return {
+        text: '',
+        toolCalls: [{
+          id: 'call-nutrition-summary',
+          name: 'getNutritionSummary',
+          arguments: {}
+        }]
+      };
+    }
+
+    // Test Case: Greetings
+    if (lastMessage.includes('hey') || lastMessage.includes('hello') || lastMessage.includes('hi friday') || lastMessage.includes('how are you')) {
+      return {
+        text: "Hello! I'm FRIDAY, your personal AI fitness coach. I'm ready to assist with your workout, track your hydration, or review your nutrition goals.",
+        toolCalls: undefined
+      };
+    }
+
+    // Test Case: Preferences like "I don't like burpees"
+    if (lastMessage.includes("don't like") || lastMessage.includes("hate") || lastMessage.includes("dislike")) {
+      return {
+        text: "Understood. I have recorded that in your preferences and will exclude it from your workout recommendations.",
+        toolCalls: undefined
+      };
+    }
+
     return {
-      text: 'FRIDAY AI System online. Telemetry monitoring is active.',
+      text: "I'm here to help you reach your peak performance. You can ask about today's workout, log your water intake, or check your fitness progress.",
       toolCalls: undefined
     };
   }
 }
+

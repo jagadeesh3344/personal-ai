@@ -26,7 +26,7 @@ export const FridayMessage: React.FC<FridayMessageProps> = ({
       <div className="flex flex-col gap-1.5 flex-1 min-w-0">
         {/* Name / Category & Time */}
         <div className={`flex items-center gap-2 text-[10px] font-bold tracking-wider uppercase ${isFriday ? 'text-zinc-400' : 'text-zinc-400 justify-end'}`}>
-          <span>{isFriday ? '🤖 FRIDAY TACTICAL OS' : 'OPERATOR'}</span>
+          <span>{isFriday ? 'FRIDAY' : 'YOU'}</span>
           {isFriday && message.category && (
             <span className="text-[8px] font-extrabold px-1.5 py-0.2 rounded bg-cyan-950/40 border border-cyan-900/30 text-cyan-400">
               {message.category}

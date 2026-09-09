@@ -89,11 +89,12 @@ export const Settings: React.FC<SettingsProps> = ({
           <div className="space-y-4">
             <Input 
               id="name"
-              label="OPERATOR CODE / NAME"
+              label="YOUR NAME"
               value={userProfile.name}
               onChange={(e) => handleChange('name', e.target.value)}
               placeholder="e.g. Jagadeesh"
             />
+
 
             <div className="grid grid-cols-2 gap-4">
               <Input 

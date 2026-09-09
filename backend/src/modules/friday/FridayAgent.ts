@@ -3,6 +3,8 @@ import { GeminiProvider } from './ai/GeminiProvider.js';
 import { FRIDAY_SYSTEM_PROMPT } from './ai/prompt.js';
 import { FRIDAY_TOOL_DEFINITIONS, executeBackendTool } from './tools/fridayTools.js';
 import { FridayRepository } from '../../repositories/friday.repo.js';
+import { ProfileRepository } from '../../repositories/profile.repo.js';
+import { logFridayEvent } from './ai/fridayLogger.js';
 
 export interface FridayAgentResponse {
   conversationId: string;
@@ -29,21 +31,34 @@ export class FridayAgent {
     // 1. Get or create conversation record for authenticated user
     const conversation = await FridayRepository.getOrCreateConversation(userId, conversationId);
 
+    logFridayEvent('FRIDAY_REQUEST', {
+      userId,
+      conversationId: conversation.id,
+      messageLength: messageText.length
+    });
+
     // 2. Persist user incoming message
     await FridayRepository.saveMessage(userId, conversation.id, 'user', messageText);
 
-    // 3. Load short-term history & long-term memory
+    // 3. Load short-term history, long-term memory, and user equipment profile
     const recentMessages = await FridayRepository.getRecentMessages(userId, conversation.id, 10);
     const longTermMemories = await FridayRepository.getLongTermMemories(userId);
+    const profile = await ProfileRepository.getProfile(userId);
 
-    // 4. Construct memory context
+    // 4. Construct equipment safety & memory context
     let memoryPrompt = '';
     if (longTermMemories.length > 0) {
-      memoryPrompt = `\n### USER'S ESTABLISHED PREFERENCES & MEMORY:\n` +
+      memoryPrompt += `\n### USER'S ESTABLISHED PREFERENCES & MEMORY:\n` +
         longTermMemories.map(m => `- ${m.key}: ${m.value}`).join('\n');
     }
 
-    const fullSystemInstruction = `${FRIDAY_SYSTEM_PROMPT}${memoryPrompt}`;
+    const equipmentConstraint = `\n### USER PROFILE & EQUIPMENT SAFETY CONSTRAINTS:\n` +
+      `- Environment: ${profile?.trainingEnvironment || 'HOME'}\n` +
+      `- Stored Equipment: ${(profile?.equipment || ['NONE']).join(', ')}\n` +
+      `- Fitness Goal: ${profile?.goal || 'GENERAL_FITNESS'}\n` +
+      `STRICT RULE: Never recommend equipment not listed above. The deterministic workout engine is the ultimate authority.\n`;
+
+    const fullSystemInstruction = `${FRIDAY_SYSTEM_PROMPT}${equipmentConstraint}${memoryPrompt}`;
 
     const formattedMessages: ChatMessage[] = recentMessages.map(m => ({
       role: m.sender === 'friday' ? 'model' : 'user',
@@ -63,14 +78,22 @@ export class FridayAgent {
 
     if (initialResult.toolCalls && initialResult.toolCalls.length > 0) {
       for (const call of initialResult.toolCalls) {
+        logFridayEvent('TOOL_CALL_REQUESTED', {
+          tool: call.name,
+          arguments: call.arguments
+        });
+
         try {
           const result = await executeBackendTool(userId, call.name, call.arguments);
+          logFridayEvent('TOOL_EXECUTED', { tool: call.name, success: true });
+          logFridayEvent('TOOL_RESULT_RETURNED', { tool: call.name, result });
           executedTools.push({
             name: call.name,
             arguments: call.arguments,
             result
           });
         } catch (err: any) {
+          logFridayEvent('TOOL_EXECUTED', { tool: call.name, success: false, error: err.message });
           executedTools.push({
             name: call.name,
             arguments: call.arguments,
@@ -84,7 +107,7 @@ export class FridayAgent {
         ...formattedMessages,
         {
           role: 'user',
-          content: `Tool Execution Results:\n${JSON.stringify(executedTools, null, 2)}\nProvide a natural, concise, coaching response directly addressing the user based strictly on these actual results.`
+          content: `Tool Execution Results:\n${JSON.stringify(executedTools, null, 2)}\nProvide a natural, encouraging coaching response directly addressing the user based strictly on these actual results.`
         }
       ];
 
@@ -100,7 +123,7 @@ export class FridayAgent {
     }
 
     if (!finalReply) {
-      finalReply = "I have reviewed your request. Telemetry status is synchronized.";
+      finalReply = "I have updated your training log. What would you like to focus on next?";
     }
 
     // 7. Persist FRIDAY response message with tool metadata
@@ -111,6 +134,12 @@ export class FridayAgent {
       finalReply, 
       { toolCalls: executedTools }
     );
+
+    logFridayEvent('FRIDAY_FINAL_RESPONSE', {
+      conversationId: conversation.id,
+      replyLength: finalReply.length,
+      toolsCount: executedTools.length
+    });
 
     // 8. Extract long-term preferences if mentioned (e.g. "I don't like burpees")
     this.extractAndSavePreferences(userId, messageText).catch(err => {
@@ -127,27 +156,38 @@ export class FridayAgent {
   private formatFallbackFromToolResults(tools: Array<{ name: string; result: any }>): string {
     const hydrTool = tools.find(t => t.name === 'logHydration');
     if (hydrTool && !hydrTool.result.error) {
-      return `Logged ${hydrTool.result.entry?.amountMl || 500} ml of water. Your current total is ${hydrTool.result.status?.consumedMl} ml of your ${hydrTool.result.status?.targetMl} ml target.`;
+      const amount = hydrTool.result.entry?.amountMl || 500;
+      const consumed = hydrTool.result.status?.consumedMl;
+      const target = hydrTool.result.status?.targetMl;
+      return `Logged ${amount} ml of water for you. You've reached ${consumed} ml toward your ${target} ml daily target. Great hydration habit!`;
     }
 
     const hydrSummary = tools.find(t => t.name === 'getHydrationSummary');
     if (hydrSummary && !hydrSummary.result.error) {
-      return `You have consumed ${hydrSummary.result.consumedMl} ml of water today (${hydrSummary.result.percentage}% of your ${hydrSummary.result.targetMl} ml target).`;
+      return `You have had ${hydrSummary.result.consumedMl} ml of water today (${hydrSummary.result.percentage}% of your ${hydrSummary.result.targetMl} ml goal). Keep it up!`;
     }
 
     const workoutToday = tools.find(t => t.name === 'getTodayWorkout');
     if (workoutToday && !workoutToday.result.error) {
       const names = (workoutToday.result.exercises || []).map((e: any) => e.name).join(', ');
-      return `Today's protocol: ${workoutToday.result.dayName}. Planned exercises: ${names}.`;
+      return `Here is your workout for today: ${workoutToday.result.dayName}. Planned exercises: ${names}. Let's get to work!`;
     }
 
     const progressSummary = tools.find(t => t.name === 'getProgressSummary');
     if (progressSummary && !progressSummary.result.error) {
       const count = progressSummary.result.measurements?.length || 0;
-      return `You have ${count} logged biometric measurements on record. Keep maintaining consistent adherence.`;
+      return `You currently have ${count} biometric entries logged. Keep staying consistent with your training and measurements!`;
     }
 
-    return "Action completed and recorded to your telemetry log.";
+    const nutritionSummary = tools.find(t => t.name === 'getNutritionSummary');
+    if (nutritionSummary && !nutritionSummary.result.error) {
+      const targets = nutritionSummary.result.targets;
+      if (targets) {
+        return `Your daily nutrition targets are ${targets.targetCalories} kcal with ${targets.proteinGrams}g of protein, ${targets.carbsGrams}g of carbs, and ${targets.fatGrams}g of fat.`;
+      }
+    }
+
+    return "I've recorded that in your training log. What would you like to review next?";
   }
 
   private async extractAndSavePreferences(userId: string, message: string): Promise<void> {
@@ -159,3 +199,4 @@ export class FridayAgent {
     }
   }
 }
+

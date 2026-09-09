@@ -69,11 +69,12 @@ export default function App() {
     {
       id: 'init-msg',
       sender: 'friday',
-      text: 'FRIDAY AI System Online. Telemetry and tool interfaces connected.',
+      text: "Hello! I'm FRIDAY, your personal AI trainer. Ready to check today's workout, log your hydration, or review your fitness progress?",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       category: 'system'
     }
   ]);
+
 
   // Sync profile edits to ProfileRepository
   useEffect(() => {
@@ -180,10 +181,11 @@ export default function App() {
     const confirmationMsg: FridayMessage = {
       id: `msg-${Date.now()}`,
       sender: 'friday',
-      text: `Session "${session.dayName}" recorded successfully. Excellent effort, Operator.`,
+      text: `Session "${session.dayName}" recorded successfully. Great job on completing your workout!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       category: 'workout'
     };
+
     setFridayMessages(prev => [...prev, confirmationMsg]);
   };
 

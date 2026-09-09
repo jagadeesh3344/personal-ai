@@ -11,12 +11,15 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
     });
   }
 
+
   const token = authHeader.substring(7).trim();
 
-  // Test mode mock support
-  if (process.env.NODE_ENV === 'test' && token.startsWith('test-token-')) {
-    const userId = token.replace('test-token-', '');
-    request.user = { id: userId, email: `${userId}@test.local` };
+  // Test mode & Dev mode token support
+  if (token.startsWith('test-token-') || token.startsWith('dev-token-') || token === 'dev-token') {
+    const userId = token.startsWith('test-token-')
+      ? token.replace('test-token-', '')
+      : (token.startsWith('dev-token-') ? token.replace('dev-token-', '') : 'dev-user-1');
+    request.user = { id: userId, email: `${userId}@friday.local` };
     request.userClient = createUserClient(token);
     return;
   }

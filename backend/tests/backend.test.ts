@@ -368,6 +368,94 @@ describe('FRIDAY Backend Integration & Security Tests', () => {
       expect(hydrTool).toBeDefined();
     });
 
+    it('getProgressSummary is invoked for progress questions', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/friday/message',
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: {
+          conversationId: convAId,
+          message: 'What is my progress?'
+        }
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.data.message).toBeDefined();
+      const progressTool = body.data.toolCalls?.find((t: any) => t.name === 'getProgressSummary');
+      expect(progressTool).toBeDefined();
+    });
+
+    it('Different user messages produce contextually distinct replies and NOT a generic hardcoded response', async () => {
+      const genericSimMsg = "FRIDAY Agent online. I am monitoring your telemetry and training metrics. What would you like to review?";
+      const genericTelemetryMsg = "FRIDAY AI System online. Telemetry monitoring is active.";
+
+      const prompts = [
+        'Hey FRIDAY',
+        'What is my progress?',
+        "What's my workout today?",
+        'I drank 500 ml of water',
+        'How much water have I had today?',
+        "I don't like burpees."
+      ];
+
+      const responses: string[] = [];
+
+      for (const prompt of prompts) {
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/friday/message',
+          headers: { authorization: `Bearer ${userAToken}` },
+          payload: { message: prompt }
+        });
+
+        expect(res.statusCode).toBe(200);
+        const body = JSON.parse(res.body);
+        expect(body.success).toBe(true);
+        const reply = body.data.message;
+
+        // Verify none equal the buggy hardcoded fallback messages
+        expect(reply).not.toBe(genericSimMsg);
+        expect(reply).not.toBe(genericTelemetryMsg);
+        expect(reply.length).toBeGreaterThan(10);
+
+        responses.push(reply);
+      }
+
+      // Verify that responses are distinct (not all identical generic responses)
+      const uniqueResponses = new Set(responses);
+      expect(uniqueResponses.size).toBeGreaterThanOrEqual(4);
+    });
+
+    it('Gemini/tool results are converted into a final assistant response', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/friday/message',
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: { message: 'I drank 500 ml of water' }
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.data.message).toContain('500 ml');
+    });
+
+    it('Backend failures return structured error without fabricated success', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/friday/message',
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: {} // missing message field
+      });
+
+      expect(res.statusCode).toBe(400);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(false);
+      expect(body.error).toBeDefined();
+    });
+
     it('User A cannot access User B FRIDAY conversation history', async () => {
       const res = await app.inject({
         method: 'GET',
@@ -392,3 +480,4 @@ describe('FRIDAY Backend Integration & Security Tests', () => {
     });
   });
 });
+

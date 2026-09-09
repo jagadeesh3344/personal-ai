@@ -26,7 +26,7 @@ export const FridayInsightCard: React.FC<FridayInsightCardProps> = ({
                 <Bot className="w-4 h-4 animate-pulse" />
               </div>
               <div>
-                <h3 className="text-xs font-bold text-white uppercase tracking-widest">FRIDAY Tactical AI</h3>
+                <h3 className="text-xs font-bold text-white uppercase tracking-widest">FRIDAY AI Trainer</h3>
                 <span className="text-[8px] text-cyan-400 font-bold uppercase tracking-widest">Active Coach</span>
               </div>
             </div>

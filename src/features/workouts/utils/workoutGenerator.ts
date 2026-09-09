@@ -55,11 +55,24 @@ export function generateWorkout(profile: UserProfile): WorkoutPlan {
       (exDef.equipmentRequired.length === 1 && exDef.equipmentRequired[0] === 'NONE');
     const initialWeight = isBodyweight ? 0 : (exDef.equipmentRequired.includes('DUMBBELLS') ? 12 : 30);
 
+    const isPlankOrCardio = exDef.name.toLowerCase().includes('plank') || 
+      exDef.name.toLowerCase().includes('climber') || 
+      targetReps.toLowerCase().includes('sec');
+    const isBand = exDef.equipmentRequired.includes('RESISTANCE_BANDS') || exDef.name.toLowerCase().includes('band');
+
+    const trackingType = exDef.trackingType || (
+      isPlankOrCardio ? 'TIME_SECONDS' :
+      isBand ? 'REPS_RESISTANCE' :
+      isBodyweight ? 'REPS_ONLY' : 'WEIGHT_AND_REPS'
+    );
+
     const sets: WorkoutSet[] = Array.from({ length: targetSets }).map((_, setIdx) => ({
       id: `set-${exDef.id}-d${dayIndex}-s${setIdx + 1}`,
       setNumber: setIdx + 1,
-      weightKg: initialWeight,
-      reps: parseInt(targetReps, 10) || 10,
+      weightKg: isBodyweight || isPlankOrCardio ? 0 : initialWeight,
+      reps: isPlankOrCardio ? 0 : (parseInt(targetReps, 10) || 10),
+      durationSeconds: isPlankOrCardio ? (parseInt(targetReps, 10) || 45) : undefined,
+      resistanceLevel: isBand ? 'Medium' : undefined,
       completed: false
     }));
 
@@ -72,9 +85,11 @@ export function generateWorkout(profile: UserProfile): WorkoutPlan {
       targetReps,
       restSeconds,
       notes: exDef.instructions,
+      trackingType,
       sets
     };
   };
+
 
   const pushExercises = availablePool.filter(e => (e.muscleGroups || []).some(m => ['CHEST', 'SHOULDERS', 'TRICEPS'].includes(m)));
   const pullExercises = availablePool.filter(e => (e.muscleGroups || []).some(m => ['BACK', 'BICEPS'].includes(m)));

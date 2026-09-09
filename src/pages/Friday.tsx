@@ -1,10 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Bot, Terminal, Send, Sparkles, Mic, MicOff } from 'lucide-react';
+import { Bot, Send, Sparkles, MicOff } from 'lucide-react';
 import { FridayMessage as FridayMessageType, UserProfile } from '../types';
 import { FridayMessage } from '../components/friday/FridayMessage';
-import { defaultFridayAgent } from '../features/friday/FridayAgent';
 import { fridayApi } from '../services/api/fridayApi';
 
 interface FridayProps {
@@ -24,9 +23,10 @@ export const Friday: React.FC<FridayProps> = ({
 
   const quickPrompts = [
     "What's my workout today?",
-    "How much protein have I logged today?",
-    "Log 500ml water",
-    "What is my current goal and biometrics?"
+    "What is my progress?",
+    "I drank 500 ml of water",
+    "How much water have I had today?",
+    "What are my calorie and protein targets?"
   ];
 
   const [conversationId, setConversationId] = useState<string | undefined>();
@@ -53,7 +53,7 @@ export const Friday: React.FC<FridayProps> = ({
     setIsProcessing(true);
 
     try {
-      // Connect to real backend FRIDAY agent
+      // Connect directly to real backend FRIDAY agent
       const response = await fridayApi.sendMessage(text.trim(), conversationId);
       if (response.success && response.data) {
         if (response.data.conversationId) {
@@ -69,30 +69,18 @@ export const Friday: React.FC<FridayProps> = ({
         };
         setMessages(prev => [...prev, replyMsg]);
       } else {
-        throw new Error(response.error || 'FRIDAY backend could not process your message');
+        throw new Error(response.error || 'FRIDAY is temporarily unavailable. Please try again.');
       }
     } catch (apiErr: any) {
-      // Local fallback with honest telemetry notification if backend is offline
-      try {
-        const localResponse = await defaultFridayAgent.processIntent(text.trim());
-        const replyMsg: FridayMessageType = {
-          id: `fri-${Date.now()}`,
-          sender: 'friday',
-          text: localResponse.reply,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          category: localResponse.toolCalled ? 'system' : 'info'
-        };
-        setMessages(prev => [...prev, replyMsg]);
-      } catch (localErr: any) {
-        const errorMsg: FridayMessageType = {
-          id: `fri-err-${Date.now()}`,
-          sender: 'friday',
-          text: `I couldn't access your telemetry right now: ${apiErr.message || 'Connection offline'}.`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          category: 'alert'
-        };
-        setMessages(prev => [...prev, errorMsg]);
-      }
+      // Display honest error message if backend or Gemini fails - no fake canned replies
+      const errorMsg: FridayMessageType = {
+        id: `fri-err-${Date.now()}`,
+        sender: 'friday',
+        text: 'FRIDAY is temporarily unavailable. Please try again.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        category: 'alert'
+      };
+      setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsProcessing(false);
     }
@@ -108,13 +96,8 @@ export const Friday: React.FC<FridayProps> = ({
           </div>
           <div>
             <h1 className="text-sm font-black text-white uppercase tracking-wider">FRIDAY AI Trainer</h1>
-            <p className="text-[10px] text-zinc-500 font-medium">AGENT TOOLS ARCHITECTURE: ACTIVE</p>
+            <p className="text-[10px] text-zinc-500 font-medium">PERSONAL FITNESS COACH</p>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-[10px] font-mono text-cyan-400 bg-cyan-500/5 px-2.5 py-1 border border-cyan-500/10 rounded-md">
-          <Terminal className="w-3.5 h-3.5 text-cyan-500" />
-          <span>TOOL-CALLING ENGINE</span>
         </div>
       </div>
 
@@ -132,14 +115,14 @@ export const Friday: React.FC<FridayProps> = ({
             </div>
 
             <h3 className="text-base font-black text-white uppercase tracking-wider mb-1">
-              FRIDAY Voice Pipeline
+              FRIDAY Voice
             </h3>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900/80 border border-zinc-800 text-[11px] text-zinc-400 font-mono mt-1">
               <MicOff className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Voice assistant coming online...</span>
+              <span>Voice assistant coming soon...</span>
             </div>
             <p className="text-xs text-zinc-500 max-w-xs mt-3 leading-relaxed">
-              Voice provider abstraction loaded. Streaming speech recognition & realtime voice feedback will activate in the next release.
+              Streaming speech recognition and real-time voice guidance will be available in an upcoming update.
             </p>
           </div>
 
@@ -171,10 +154,11 @@ export const Friday: React.FC<FridayProps> = ({
             {isProcessing && (
               <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 p-3 bg-zinc-900/40 rounded-lg">
                 <Sparkles className="w-4 h-4 animate-spin" />
-                <span>FRIDAY evaluating tools & telemetry...</span>
+                <span>FRIDAY is thinking...</span>
               </div>
             )}
           </div>
+
 
           {/* Input Box */}
           <form

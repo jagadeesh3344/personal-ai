@@ -38,7 +38,7 @@ export class FridayAgent {
       const amount = match ? parseInt(match[1], 10) : 250;
       const res = await this.executeTool('logHydration', { amountMl: amount });
       return {
-        reply: `Logged ${amount} ml of water. Your telemetry has been updated.`,
+        reply: `Logged ${amount} ml of water. Your hydration log has been updated.`,
         toolCalled: 'logHydration',
         toolResult: res
       };
@@ -76,8 +76,9 @@ export class FridayAgent {
     }
 
     return {
-      reply: "FRIDAY Agent online. I am monitoring your telemetry and training metrics. What would you like to review?"
+      reply: "Hello! I'm FRIDAY, your personal fitness coach. How can I help you today with your workouts, hydration, or progress?"
     };
+
   }
 }
 

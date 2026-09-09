@@ -112,7 +112,7 @@ export const Progress: React.FC<ProgressProps> = ({
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-900/60">
           <div className="flex items-center gap-2">
             <Scale className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Weight Telemetry Trend</h3>
+            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Weight Progress Trend</h3>
           </div>
           <span className="text-xs font-mono font-bold text-white">
             {latestWeight ? `${latestWeight} kg current` : 'No weight check-ins'}
