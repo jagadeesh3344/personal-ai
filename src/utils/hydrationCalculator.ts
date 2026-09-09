@@ -5,7 +5,7 @@ import { UserProfile } from '../types';
  * 35 ml per kg of bodyweight + 500 ml for active users + 250 ml per 30 minutes of workout duration.
  */
 export function calculateHydrationTarget(profile: UserProfile): number {
-  const weight = profile.currentWeight > 0 ? profile.currentWeight : 70;
+  const weight = profile.currentWeightKg > 0 ? profile.currentWeightKg : 70;
   let targetMl = weight * 35;
 
   if (profile.activityLevel && profile.activityLevel !== 'SEDENTARY') {

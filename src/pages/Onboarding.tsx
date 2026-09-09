@@ -43,7 +43,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
   // Step 5: Equipment
   const [hasNoEquipment, setHasNoEquipment] = useState<boolean>(true);
-  const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment[]>([]);
 
   // Step 6: Experience
   const [experience, setExperience] = useState<TrainingExperience>('BEGINNER');
@@ -71,9 +71,15 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     { id: 'ENDURANCE', title: 'Improve Endurance', desc: 'High stamina, aerobic threshold, and pacing', icon: Activity },
   ];
 
-  const gymEquipmentCatalog = [
-    'Dumbbell', 'Barbell', 'Bench', 'Cable Machine', 'Pull-up Bar', 
-    'Resistance Bands', 'Kettlebell', 'Gym Machine', 'Squat Rack'
+  const gymEquipmentCatalog: { id: Equipment; label: string }[] = [
+    { id: 'DUMBBELLS', label: 'Dumbbells' },
+    { id: 'BARBELL', label: 'Barbell' },
+    { id: 'BENCH', label: 'Weight Bench' },
+    { id: 'CABLE_MACHINE', label: 'Cable Machine' },
+    { id: 'PULLUP_BAR', label: 'Pull-up Bar' },
+    { id: 'RESISTANCE_BANDS', label: 'Resistance Bands' },
+    { id: 'KETTLEBELL', label: 'Kettlebell' },
+    { id: 'GYM_MACHINE', label: 'Gym Machine' }
   ];
 
   const handleNext = () => {
@@ -98,7 +104,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     );
   };
 
-  const toggleEquipmentItem = (item: string) => {
+  const toggleEquipmentItem = (item: Equipment) => {
     setHasNoEquipment(false);
     setSelectedEquipment(prev => 
       prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
@@ -106,16 +112,15 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   };
 
   const finalizeProfile = () => {
-    const finalEquipment = hasNoEquipment ? [] : selectedEquipment;
+    const finalEquipment: Equipment[] = hasNoEquipment ? ['NONE'] : (selectedEquipment.length > 0 ? selectedEquipment : ['NONE']);
 
     const profile: UserProfile = {
-      id: `usr-${Date.now()}`,
       name: name.trim() || 'Operator',
       age: parseInt(age, 10) || 25,
       sex,
-      height: parseFloat(height) || 175,
-      currentWeight: parseFloat(currentWeight) || 70,
-      targetWeight: parseFloat(targetWeight) || parseFloat(currentWeight) || 70,
+      heightCm: parseFloat(height) || 175,
+      currentWeightKg: parseFloat(currentWeight) || 70,
+      targetWeightKg: parseFloat(targetWeight) || parseFloat(currentWeight) || 70,
       goal,
       activityLevel,
       trainingExperience: experience,
@@ -354,18 +359,18 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
               <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider pt-2">Or select equipment you own:</div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 {gymEquipmentCatalog.map(item => {
-                  const isChecked = !hasNoEquipment && selectedEquipment.includes(item);
+                  const isChecked = !hasNoEquipment && selectedEquipment.includes(item.id);
                   return (
                     <button
-                      key={item}
-                      onClick={() => toggleEquipmentItem(item)}
+                      key={item.id}
+                      onClick={() => toggleEquipmentItem(item.id)}
                       className={`p-3 rounded-lg border text-left text-xs font-semibold transition-all cursor-pointer ${
                         isChecked 
                           ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300' 
                           : 'bg-zinc-900/40 border-zinc-850 text-zinc-400 hover:border-zinc-700'
                       }`}
                     >
-                      {item}
+                      {item.label}
                     </button>
                   );
                 })}

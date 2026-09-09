@@ -48,8 +48,8 @@ export function calculateMaintenanceCalories(
  * - Carbs: Remaining calories (4 kcal/g)
  */
 export function calculateNutritionTargets(profile: UserProfile): NutritionTargets {
-  const weight = profile.currentWeight > 0 ? profile.currentWeight : 70;
-  const height = profile.height > 0 ? profile.height : 170;
+  const weight = profile.currentWeightKg > 0 ? profile.currentWeightKg : 70;
+  const height = profile.heightCm > 0 ? profile.heightCm : 170;
   const age = profile.age > 0 ? profile.age : 25;
   const sex = profile.sex || 'OTHER';
   const activity = profile.activityLevel || 'MODERATELY_ACTIVE';

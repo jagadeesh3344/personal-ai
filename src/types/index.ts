@@ -1,47 +1,5 @@
-export type Goal = 
-  | 'FAT_LOSS' 
-  | 'GAIN_MUSCLE' 
-  | 'BODY_RECOMPOSITION' 
-  | 'STRENGTH' 
-  | 'GENERAL_FITNESS' 
-  | 'ENDURANCE';
-
-export type Sex = 'MALE' | 'FEMALE' | 'OTHER';
-
-export type ActivityLevel = 
-  | 'SEDENTARY' 
-  | 'LIGHTLY_ACTIVE' 
-  | 'MODERATELY_ACTIVE' 
-  | 'VERY_ACTIVE';
-
-export type TrainingExperience = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
-
-export type TrainingEnvironment = 'HOME' | 'GYM' | 'OUTDOOR';
-
-export type DietPreference = 'STANDARD' | 'VEGETARIAN' | 'VEGAN' | 'KETO' | 'PALEO';
-
-export interface UserProfile {
-  id: string;
-  name: string;
-  age: number;
-  sex: Sex;
-  height: number; // in cm
-  currentWeight: number; // in kg
-  targetWeight: number; // in kg
-  goal: Goal;
-  activityLevel: ActivityLevel;
-  trainingExperience: TrainingExperience;
-  trainingEnvironment: TrainingEnvironment;
-  equipment: string[]; // e.g. [] for Home + No Equipment
-  availableWorkoutDays: string[]; // e.g. ['MON', 'WED', 'FRI']
-  preferredWorkoutDuration: number; // in minutes (e.g. 45)
-  dietPreference: DietPreference;
-  foodPreferences: string[];
-  allergies: string[];
-  intolerances: string[];
-  createdAt: string;
-  updatedAt: string;
-}
+export * from './profile';
+import { Goal, TrainingEnvironment, Equipment } from './profile';
 
 export type MuscleGroup = 
   | 'CHEST' 
@@ -52,30 +10,6 @@ export type MuscleGroup =
   | 'LEGS' 
   | 'CORE' 
   | 'CARDIO';
-
-export type EquipmentType = 
-  | 'DUMBBELL' 
-  | 'BARBELL' 
-  | 'BENCH' 
-  | 'CABLE_MACHINE' 
-  | 'PULL_UP_BAR' 
-  | 'RESISTANCE_BANDS' 
-  | 'KETTLEBELL' 
-  | 'GYM_MACHINE' 
-  | 'SQUAT_RACK';
-
-export interface ExerciseDefinition {
-  id: string;
-  name: string;
-  muscleGroups: MuscleGroup[];
-  equipmentRequired: EquipmentType[]; // empty means purely bodyweight
-  environments: TrainingEnvironment[];
-  difficulty: TrainingExperience;
-  instructions: string;
-  defaultReps: string;
-  defaultSets: number;
-  restSeconds: number;
-}
 
 export interface WorkoutSet {
   id: string;
@@ -100,7 +34,7 @@ export interface WorkoutExercise {
 
 export interface WorkoutDay {
   id: string;
-  dayName: string; // e.g. "Day 1 - Push"
+  dayName: string;
   focus: string;
   exercises: WorkoutExercise[];
 }
@@ -111,7 +45,7 @@ export interface WorkoutPlan {
   name: string;
   goal: Goal;
   environment: TrainingEnvironment;
-  equipment: string[];
+  equipment: Equipment[];
   createdAt: string;
   days: WorkoutDay[];
 }
@@ -163,11 +97,11 @@ export interface Meal {
 export interface HydrationEntry {
   id: string;
   amountMl: number;
-  timestamp: string; // ISO string
+  timestamp: string;
 }
 
 export interface DailyHydration {
-  date: string; // YYYY-MM-DD
+  date: string;
   targetMl: number;
   consumedMl: number;
   entries: HydrationEntry[];
@@ -186,13 +120,13 @@ export interface Habit {
   name: string;
   icon: string;
   streak: number;
-  weeklyHistory: { [key: string]: boolean }; // Mon - Sun
+  weeklyHistory: { [key: string]: boolean };
   currentCompleted: boolean;
 }
 
 export interface WeightRecord {
   id: string;
-  date: string; // YYYY-MM-DD or formatted display
+  date: string;
   weightKg: number;
 }
 
