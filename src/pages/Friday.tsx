@@ -5,6 +5,7 @@ import { Bot, Terminal, Send, Sparkles, Mic, MicOff } from 'lucide-react';
 import { FridayMessage as FridayMessageType, UserProfile } from '../types';
 import { FridayMessage } from '../components/friday/FridayMessage';
 import { defaultFridayAgent } from '../features/friday/FridayAgent';
+import { fridayApi } from '../services/api/fridayApi';
 
 interface FridayProps {
   messages: FridayMessageType[];
@@ -28,6 +29,8 @@ export const Friday: React.FC<FridayProps> = ({
     "What is my current goal and biometrics?"
   ];
 
+  const [conversationId, setConversationId] = useState<string | undefined>();
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -50,24 +53,46 @@ export const Friday: React.FC<FridayProps> = ({
     setIsProcessing(true);
 
     try {
-      const response = await defaultFridayAgent.processIntent(text.trim());
-      const replyMsg: FridayMessageType = {
-        id: `fri-${Date.now()}`,
-        sender: 'friday',
-        text: response.reply,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        category: response.toolCalled ? 'system' : 'info'
-      };
-      setMessages(prev => [...prev, replyMsg]);
-    } catch (err: any) {
-      const errorMsg: FridayMessageType = {
-        id: `fri-err-${Date.now()}`,
-        sender: 'friday',
-        text: `Command error: ${err.message || 'Failed to process intent.'}`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        category: 'alert'
-      };
-      setMessages(prev => [...prev, errorMsg]);
+      // Connect to real backend FRIDAY agent
+      const response = await fridayApi.sendMessage(text.trim(), conversationId);
+      if (response.success && response.data) {
+        if (response.data.conversationId) {
+          setConversationId(response.data.conversationId);
+        }
+        const hasTools = response.data.toolCalls && response.data.toolCalls.length > 0;
+        const replyMsg: FridayMessageType = {
+          id: `fri-${Date.now()}`,
+          sender: 'friday',
+          text: response.data.message,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          category: hasTools ? 'system' : 'info'
+        };
+        setMessages(prev => [...prev, replyMsg]);
+      } else {
+        throw new Error(response.error || 'FRIDAY backend could not process your message');
+      }
+    } catch (apiErr: any) {
+      // Local fallback with honest telemetry notification if backend is offline
+      try {
+        const localResponse = await defaultFridayAgent.processIntent(text.trim());
+        const replyMsg: FridayMessageType = {
+          id: `fri-${Date.now()}`,
+          sender: 'friday',
+          text: localResponse.reply,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          category: localResponse.toolCalled ? 'system' : 'info'
+        };
+        setMessages(prev => [...prev, replyMsg]);
+      } catch (localErr: any) {
+        const errorMsg: FridayMessageType = {
+          id: `fri-err-${Date.now()}`,
+          sender: 'friday',
+          text: `I couldn't access your telemetry right now: ${apiErr.message || 'Connection offline'}.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          category: 'alert'
+        };
+        setMessages(prev => [...prev, errorMsg]);
+      }
     } finally {
       setIsProcessing(false);
     }

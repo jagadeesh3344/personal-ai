@@ -5,3 +5,4 @@ export * from './workoutsApi';
 export * from './nutritionApi';
 export * from './hydrationApi';
 export * from './progressApi';
+export * from './fridayApi';

@@ -11,7 +11,8 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url().default('https://placeholder-project.supabase.co'),
   SUPABASE_ANON_KEY: z.string().default('placeholder-anon-key'),
   SUPABASE_SERVICE_ROLE_KEY: z.string().default('placeholder-service-role-key'),
-  SUPABASE_JWT_SECRET: z.string().optional()
+  SUPABASE_JWT_SECRET: z.string().optional(),
+  GEMINI_API_KEY: z.string().optional()
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

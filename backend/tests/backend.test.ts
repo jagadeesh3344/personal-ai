@@ -299,4 +299,96 @@ describe('FRIDAY Backend Integration & Security Tests', () => {
       expect(body.error).toContain('belonging to another user');
     });
   });
+
+  // 8. FRIDAY AI Agent & Tool Execution Tests
+  describe('FRIDAY AI Agent Tool Calling & Security', () => {
+    let convAId: string;
+
+    it('User asks for workout -> getTodayWorkout executes', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/friday/message',
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: { message: 'What is my workout today?' }
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.data.message).toBeDefined();
+      expect(body.data.toolCalls).toBeDefined();
+      const toolCall = body.data.toolCalls.find((t: any) => t.name === 'getTodayWorkout');
+      expect(toolCall).toBeDefined();
+      convAId = body.data.conversationId;
+    });
+
+    it('User says "I drank 500 ml" -> logHydration executes and updates database', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/friday/message',
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: {
+          conversationId: convAId,
+          message: 'I drank 500 ml'
+        }
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      const logTool = body.data.toolCalls.find((t: any) => t.name === 'logHydration');
+      expect(logTool).toBeDefined();
+      expect(logTool.arguments.amountMl).toBe(500);
+
+      // Verify real database record
+      const hydrRes = await app.inject({
+        method: 'GET',
+        url: '/api/hydration/today',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+      const hydrBody = JSON.parse(hydrRes.body);
+      expect(hydrBody.consumedMl).toBeGreaterThanOrEqual(500);
+    });
+
+    it('User asks for hydration -> getHydrationSummary executes', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/friday/message',
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: {
+          conversationId: convAId,
+          message: 'How much water have I had today?'
+        }
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      const hydrTool = body.data.toolCalls.find((t: any) => t.name === 'getHydrationSummary');
+      expect(hydrTool).toBeDefined();
+    });
+
+    it('User A cannot access User B FRIDAY conversation history', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/friday/history/${convAId}`,
+        headers: { authorization: `Bearer ${userBToken}` }
+      });
+
+      const body = JSON.parse(res.body);
+      // Messages belonging to User A must not be returned to User B
+      expect(body.messages?.length || 0).toBe(0);
+    });
+
+    it('Tool validation rejects invalid arguments (e.g. negative hydration or missing fields)', async () => {
+      const { executeBackendTool } = await import('../src/modules/friday/tools/fridayTools.js');
+      await expect(
+        executeBackendTool('user-a', 'logHydration', { amountMl: -100 })
+      ).rejects.toThrow('amountMl must be a positive number');
+
+      await expect(
+        executeBackendTool('user-a', 'unauthorizedTool' as any, {})
+      ).rejects.toThrow('not a registered FRIDAY tool');
+    });
+  });
 });
