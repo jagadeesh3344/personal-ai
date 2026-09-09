@@ -1,0 +1,6 @@
+{
+  "name": "FRIDAY",
+  "description": "Your Personal AI Fitness Trainer, Voice Assistant, and Workout Companion",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
