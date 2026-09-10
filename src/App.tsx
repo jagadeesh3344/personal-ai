@@ -285,6 +285,7 @@ export default function App() {
           <WorkoutPage
             plan={workoutPlan}
             activeSession={activeSession}
+            userProfile={userProfile}
             onUpdateSession={handleUpdateSession}
             onCompleteSession={handleCompleteSession}
             setTab={setCurrentTab}

@@ -7,10 +7,13 @@ import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Dumbbell, Timer, ArrowLeft, CheckCircle, Camera, Plus, Play, Pause } from 'lucide-react';
 import { WorkoutPlan, WorkoutSession, WorkoutExercise, WorkoutSet } from '../types';
+import { UserProfile } from '../types/profile';
+import { workoutsApi } from '../services/api/workoutsApi';
 
 interface WorkoutProps {
   plan: WorkoutPlan | null;
   activeSession: WorkoutSession | null;
+  userProfile?: UserProfile | null;
   onUpdateSession: (session: WorkoutSession) => void;
   onCompleteSession: (session: WorkoutSession) => void;
   setTab: (tab: string) => void;
@@ -19,6 +22,7 @@ interface WorkoutProps {
 export const Workout: React.FC<WorkoutProps> = ({
   plan,
   activeSession,
+  userProfile,
   onUpdateSession,
   onCompleteSession,
   setTab
@@ -195,9 +199,30 @@ export const Workout: React.FC<WorkoutProps> = ({
     setShowAddModal(false);
   };
 
-  const handleCameraLogReps = (exerciseId: string, reps: number) => {
+  const handleCameraLogReps = async (exerciseId: string, reps: number, formSummary?: string) => {
     if (!activeSession) return;
 
+    let loggedSetNumber = 1;
+    const currentEx = activeSession.exercises.find(e => e.id === exerciseId);
+    if (currentEx) {
+      const nextUncompleted = currentEx.sets.find(s => !s.completed);
+      loggedSetNumber = nextUncompleted ? nextUncompleted.setNumber : currentEx.sets.length + 1;
+    }
+
+    // 1. Dispatch to real backend API to persist in workout_sets table
+    try {
+      await workoutsApi.addSet(activeSession.id, {
+        exerciseId,
+        setNumber: loggedSetNumber,
+        weightKg: currentEx?.sets[0]?.weightKg || 0,
+        reps,
+        completed: true
+      });
+    } catch (err) {
+      console.warn('[Workout] Notice: backend set sync handled or in offline mode', err);
+    }
+
+    // 2. Update local session state
     const updatedExercises = activeSession.exercises.map(ex => {
       if (ex.id === exerciseId) {
         let setMarked = false;
@@ -213,7 +238,7 @@ export const Workout: React.FC<WorkoutProps> = ({
           updatedSets.push({
             id: `set-cam-${Date.now()}`,
             setNumber: updatedSets.length + 1,
-            weightKg: ex.sets[ex.sets.length - 1]?.weightKg || 10,
+            weightKg: ex.sets[ex.sets.length - 1]?.weightKg || 0,
             reps,
             completed: true,
             completedAt: new Date().toISOString()
@@ -407,7 +432,11 @@ export const Workout: React.FC<WorkoutProps> = ({
       {isCameraActive && (
         <WorkoutCamera
           exercise={activeCameraExercise}
+          userProfile={userProfile}
+          currentSetIndex={(activeCameraExercise?.sets.filter(s => s.completed).length || 0) + 1}
+          totalSets={activeCameraExercise?.sets.length || 3}
           onLogCompletedReps={handleCameraLogReps}
+          onSkipExercise={() => setIsCameraActive(false)}
           onClose={() => setIsCameraActive(false)}
         />
       )}

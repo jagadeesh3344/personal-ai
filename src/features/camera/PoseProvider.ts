@@ -1,40 +1,39 @@
-export interface NormalizedLandmark {
-  x: number;
-  y: number;
-  z?: number;
-  visibility?: number;
+import { PoseDetectionResult, PoseLandmark } from './types';
+
+export interface PoseProviderOptions {
+  width?: number;
+  height?: number;
+  minDetectionConfidence?: number;
+  minTrackingConfidence?: number;
 }
 
-export interface PoseFrame {
-  landmarks: NormalizedLandmark[];
-  timestampMs: number;
-}
+export interface PoseProvider {
+  /**
+   * Initializes camera stream and starts pose detection on the given video element.
+   */
+  start(
+    videoElement: HTMLVideoElement,
+    onPose: (result: PoseDetectionResult) => void,
+    onError?: (error: Error) => void,
+    options?: PoseProviderOptions
+  ): Promise<void>;
 
-export type PoseStatus = 'IDLE' | 'INITIALIZING' | 'TRACKING' | 'ERROR';
+  /**
+   * Stops video stream, releases tracks, and halts animation frame loop.
+   */
+  stop(): void;
 
-export interface IPoseProvider {
-  status: PoseStatus;
-  initialize(videoElement: HTMLVideoElement): Promise<void>;
-  startTracking(onPoseFrame: (frame: PoseFrame) => void): void;
-  stopTracking(): void;
-}
+  /**
+   * Checks whether camera and pose detection are actively streaming.
+   */
+  isActive(): boolean;
 
-/**
- * Clean abstraction for MediaPipe / MoveNet pose detection pipeline
- */
-export class MediaPipePoseProvider implements IPoseProvider {
-  status: PoseStatus = 'INITIALIZING';
-
-  async initialize(videoElement: HTMLVideoElement): Promise<void> {
-    // Ready for MediaPipe @mediapipe/pose or TensorFlow MoveNet model weights
-    this.status = 'IDLE';
-  }
-
-  startTracking(onPoseFrame: (frame: PoseFrame) => void): void {
-    this.status = 'TRACKING';
-  }
-
-  stopTracking(): void {
-    this.status = 'IDLE';
-  }
+  /**
+   * Renders skeletal bones and landmark joints over a canvas.
+   */
+  drawSkeleton(
+    canvas: HTMLCanvasElement,
+    landmarks: PoseLandmark[],
+    quality?: 'GOOD' | 'NEEDS_ADJUSTMENT' | 'POOR'
+  ): void;
 }
