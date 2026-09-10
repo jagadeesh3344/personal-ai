@@ -138,8 +138,47 @@ export class GeminiProvider implements AIProvider {
       };
     }
 
-    // Test Case: "What is my workout today?" / "workout"
-    if (lastMessage.includes('workout') || lastMessage.includes('exercise') || lastMessage.includes('training')) {
+    // Test Case: "Start my workout"
+    if (lastMessage.includes('start') && (lastMessage.includes('workout') || lastMessage.includes('session') || lastMessage.includes('training'))) {
+      return {
+        text: '',
+        toolCalls: [{
+          id: 'call-start-workout',
+          name: 'startWorkout',
+          arguments: {}
+        }]
+      };
+    }
+
+    // Test Case: "Finish my workout" / "complete workout"
+    if ((lastMessage.includes('finish') || lastMessage.includes('complete') || lastMessage.includes('end')) && (lastMessage.includes('workout') || lastMessage.includes('session'))) {
+      return {
+        text: '',
+        toolCalls: [{
+          id: 'call-complete-workout',
+          name: 'completeWorkout',
+          arguments: {}
+        }]
+      };
+    }
+
+    // Test Case: "I completed 10 reps" / "did 12 reps"
+    const repsMatch = lastMessage.match(/(?:completed|did|done|logged)\s+(\d+)\s*(?:reps|repetitions)/i)
+      || lastMessage.match(/(\d+)\s*reps/i);
+    if (repsMatch) {
+      const reps = parseInt(repsMatch[1], 10) || 10;
+      return {
+        text: '',
+        toolCalls: [{
+          id: `call-log-set-${reps}`,
+          name: 'logWorkoutSet',
+          arguments: { reps }
+        }]
+      };
+    }
+
+    // Test Case: "What is my workout today?" / "What's my next exercise?"
+    if (lastMessage.includes('workout') || lastMessage.includes('exercise') || lastMessage.includes('training') || lastMessage.includes('next exercise')) {
       return {
         text: '',
         toolCalls: [{
@@ -149,6 +188,7 @@ export class GeminiProvider implements AIProvider {
         }]
       };
     }
+
 
     // Test Case: "What is my progress?" / "progress" / "biometrics"
     if (lastMessage.includes('progress') || lastMessage.includes('weight') || lastMessage.includes('measurement')) {

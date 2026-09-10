@@ -187,8 +187,27 @@ export class FridayAgent {
       }
     }
 
+    const startWorkoutTool = tools.find(t => t.name === 'startWorkout');
+    if (startWorkoutTool && !startWorkoutTool.result.error) {
+      const today = startWorkoutTool.result.today;
+      const firstEx = today?.exercises?.[0]?.name || 'your first exercise';
+      return `Workout session initiated. First exercise on deck: ${firstEx}. Let's get after it!`;
+    }
+
+    const logSetTool = tools.find(t => t.name === 'logWorkoutSet');
+    if (logSetTool && !logSetTool.result.error) {
+      const reps = logSetTool.result.reps || 10;
+      return `Set logged: ${reps} reps recorded. Catch your breath and prepare for the next set.`;
+    }
+
+    const completeWorkoutTool = tools.find(t => t.name === 'completeWorkout');
+    if (completeWorkoutTool && !completeWorkoutTool.result.error) {
+      return `Workout complete! Phenomenal training effort today. Your entire session has been saved to your progress record.`;
+    }
+
     return "I've recorded that in your training log. What would you like to review next?";
   }
+
 
   private async extractAndSavePreferences(userId: string, message: string): Promise<void> {
     const lower = message.toLowerCase();

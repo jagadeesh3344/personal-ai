@@ -129,24 +129,51 @@ export async function executeBackendTool(
       return WorkoutsService.getTodayWorkout(userId);
     }
     case 'startWorkout': {
-      return WorkoutsService.createSession(userId, { notes: args.notes || 'FRIDAY Session' });
+      const session = await WorkoutsService.createSession(userId, { notes: args.notes || 'Live FRIDAY Session' });
+      const today = await WorkoutsService.getTodayWorkout(userId);
+      return { session, today };
     }
     case 'logWorkoutSet': {
-      if (!args.sessionId || !args.exerciseId || typeof args.weightKg !== 'number' || typeof args.reps !== 'number') {
-        throw new Error('Invalid arguments for logWorkoutSet: sessionId, exerciseId, weightKg, reps are required.');
+      let sessionId = args.sessionId;
+      if (!sessionId) {
+        const sessions = await WorkoutsService.getSessions(userId);
+        const active = sessions.find(s => !s.completed);
+        if (active) {
+          sessionId = active.id;
+        } else {
+          const newSession = await WorkoutsService.createSession(userId, { notes: 'Live Voice Session' });
+          sessionId = newSession.id;
+        }
       }
-      return WorkoutsService.addSet(userId, args.sessionId, {
-        exerciseId: args.exerciseId,
+      let exerciseId = args.exerciseId;
+      if (!exerciseId) {
+        const todayWorkout = await WorkoutsService.getTodayWorkout(userId);
+        exerciseId = todayWorkout.exercises[0]?.exerciseId || 'push-up';
+      }
+      const reps = typeof args.reps === 'number' ? args.reps : 10;
+      const weightKg = typeof args.weightKg === 'number' ? args.weightKg : 0;
+      return WorkoutsService.addSet(userId, sessionId, {
+        exerciseId,
         setNumber: args.setNumber || 1,
-        weightKg: args.weightKg,
-        reps: args.reps,
+        weightKg,
+        reps,
         completed: args.completed ?? true
       });
     }
     case 'completeWorkout': {
-      if (!args.sessionId) throw new Error('sessionId is required for completeWorkout.');
-      return WorkoutsService.completeSession(userId, args.sessionId, args.durationSeconds || 1800, args.notes);
+      let sessionId = args.sessionId;
+      if (!sessionId) {
+        const sessions = await WorkoutsService.getSessions(userId);
+        const active = sessions.find(s => !s.completed);
+        if (active) {
+          sessionId = active.id;
+        } else {
+          throw new Error('No active workout session found to complete.');
+        }
+      }
+      return WorkoutsService.completeSession(userId, sessionId, args.durationSeconds || 1800, args.notes);
     }
+
     case 'getNutritionSummary': {
       const targets = await NutritionService.getTargets(userId);
       const meals = await NutritionService.getTodayMeals(userId, args.date);

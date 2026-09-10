@@ -6,6 +6,7 @@ import { nutritionRoutes } from './nutrition.routes.js';
 import { hydrationRoutes } from './hydration.routes.js';
 import { progressRoutes } from './progress.routes.js';
 import { fridayRoutes } from './friday.routes.js';
+import { voiceRoutes } from './voice.routes.js';
 
 export async function registerRoutes(fastify: FastifyInstance) {
   // Health check endpoint
@@ -25,4 +26,6 @@ export async function registerRoutes(fastify: FastifyInstance) {
   await fastify.register(hydrationRoutes, { prefix: '/api' });
   await fastify.register(progressRoutes, { prefix: '/api' });
   await fastify.register(fridayRoutes, { prefix: '/api' });
+  await fastify.register(voiceRoutes, { prefix: '/api' });
 }
+

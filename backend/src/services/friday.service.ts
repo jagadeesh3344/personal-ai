@@ -12,7 +12,26 @@ export class FridayService {
     return agentInstance.processUserMessage(userId, message, conversationId);
   }
 
+  static async handleVoiceMessage(
+    userId: string,
+    transcript: string,
+    conversationId?: string
+  ): Promise<FridayAgentResponse & { spokenText: string }> {
+    const response = await agentInstance.processUserMessage(userId, transcript, conversationId);
+    // Clean, natural speech text without markdown formatting
+    const spokenText = response.reply
+      .replace(/[*_#`~]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return {
+      ...response,
+      spokenText
+    };
+  }
+
   static async getConversationHistory(userId: string, conversationId: string) {
     return FridayRepository.getRecentMessages(userId, conversationId, 30);
   }
+
 }
