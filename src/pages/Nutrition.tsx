@@ -56,12 +56,17 @@ export const Nutrition: React.FC<NutritionProps> = ({
   const targetWaterLiters = (hydration.targetMl / 1000).toFixed(1);
   const currentWaterLiters = (hydration.consumedMl / 1000).toFixed(2);
 
-  const remainingCalories = targetCalories - currentCalories;
-  const remainingProtein = targetProtein - currentProtein;
-  const remainingCarbs = targetCarbs - currentCarbs;
-  const remainingFat = targetFat - currentFat;
+  const remainingCalories = Math.max(0, targetCalories - currentCalories);
+  const remainingProtein = Math.max(0, targetProtein - currentProtein);
+  const remainingCarbs = Math.max(0, targetCarbs - currentCarbs);
+  const remainingFat = Math.max(0, targetFat - currentFat);
 
-  const mealPlan = userProfile && targets ? generateDailyMealPlan(userProfile, targets) : null;
+  const rawRemainingCalories = targetCalories - currentCalories;
+  const rawRemainingProtein = targetProtein - currentProtein;
+  const rawRemainingCarbs = targetCarbs - currentCarbs;
+  const rawRemainingFat = targetFat - currentFat;
+
+  const mealPlan = userProfile && targets ? generateDailyMealPlan(userProfile, targets, meals) : null;
 
   const handleOpenAddModal = (mealId: string) => {
     setActiveMealId(mealId);
@@ -126,8 +131,8 @@ export const Nutrition: React.FC<NutritionProps> = ({
         <Card className="p-4 bg-zinc-950/40 border-zinc-850" hoverEffect={false}>
           <div className="flex justify-between items-center mb-1">
             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Calories</span>
-            <span className={`text-[10px] font-mono font-bold ${remainingCalories < 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-              {remainingCalories >= 0 ? `${remainingCalories} kcal left` : `${Math.abs(remainingCalories)} kcal over`}
+            <span className={`text-[10px] font-mono font-bold ${rawRemainingCalories < 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+              {rawRemainingCalories >= 0 ? `${remainingCalories} remaining` : `${Math.abs(rawRemainingCalories)} over`}
             </span>
           </div>
           <div className="text-xl font-black text-white font-mono">
@@ -141,7 +146,7 @@ export const Nutrition: React.FC<NutritionProps> = ({
           <div className="flex justify-between items-center mb-1">
             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Protein</span>
             <span className={`text-[10px] font-mono font-bold ${remainingProtein <= 0 ? 'text-emerald-400' : 'text-cyan-400'}`}>
-              {remainingProtein > 0 ? `${remainingProtein}g left` : 'Target met'}
+              {remainingProtein > 0 ? `${remainingProtein}g remaining` : 'Target met'}
             </span>
           </div>
           <div className="text-xl font-black text-white font-mono">
@@ -154,8 +159,8 @@ export const Nutrition: React.FC<NutritionProps> = ({
         <Card className="p-4 bg-zinc-950/40 border-zinc-850" hoverEffect={false}>
           <div className="flex justify-between items-center mb-1">
             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Carbohydrates</span>
-            <span className={`text-[10px] font-mono font-bold ${remainingCarbs < 0 ? 'text-amber-400' : 'text-zinc-400'}`}>
-              {remainingCarbs >= 0 ? `${remainingCarbs}g left` : `${Math.abs(remainingCarbs)}g over`}
+            <span className={`text-[10px] font-mono font-bold ${rawRemainingCarbs < 0 ? 'text-amber-400' : 'text-amber-300'}`}>
+              {rawRemainingCarbs >= 0 ? `${remainingCarbs}g remaining` : `${Math.abs(rawRemainingCarbs)}g over`}
             </span>
           </div>
           <div className="text-xl font-black text-white font-mono">
@@ -164,18 +169,18 @@ export const Nutrition: React.FC<NutritionProps> = ({
           <ProgressBar value={currentCarbs} max={targetCarbs} color="amber" className="mt-2" />
         </Card>
 
-        {/* Hydration */}
+        {/* Fat */}
         <Card className="p-4 bg-zinc-950/40 border-zinc-850" hoverEffect={false}>
           <div className="flex justify-between items-center mb-1">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Water Intake</span>
-            <span className="text-[10px] font-mono text-cyan-400 font-bold">
-              {Math.max(0, hydration.targetMl - hydration.consumedMl)} ml left
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Fat</span>
+            <span className={`text-[10px] font-mono font-bold ${rawRemainingFat < 0 ? 'text-red-400' : 'text-zinc-400'}`}>
+              {rawRemainingFat >= 0 ? `${remainingFat}g remaining` : `${Math.abs(rawRemainingFat)}g over`}
             </span>
           </div>
           <div className="text-xl font-black text-white font-mono">
-            {currentWaterLiters} <span className="text-xs text-zinc-500 font-normal">/ {targetWaterLiters}L</span>
+            {currentFat} <span className="text-xs text-zinc-500 font-normal">/ {targetFat}g</span>
           </div>
-          <ProgressBar value={hydration.consumedMl} max={hydration.targetMl} color="cyan" className="mt-2" />
+          <ProgressBar value={currentFat} max={targetFat} color="red" className="mt-2" />
         </Card>
       </div>
 
@@ -233,6 +238,71 @@ export const Nutrition: React.FC<NutritionProps> = ({
           </div>
         )}
       </Card>
+
+      {/* FRIDAY Next Recommended Meal Banner */}
+      {mealPlan?.nextRecommendedMeal && (
+        mealPlan.nextRecommendedMeal.status === 'DAILY_COMPLETE' ? (
+          <Card className="p-4 bg-emerald-950/20 border-emerald-500/30 text-emerald-400 flex items-center justify-between" hoverEffect={false}>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <div className="text-xs font-mono font-bold tracking-wider uppercase text-emerald-300">
+                  Daily Nutrition Complete
+                </div>
+                <p className="text-xs text-zinc-300 mt-0.5">
+                  {mealPlan.nextRecommendedMeal.rationale || mealPlan.nextRecommendedMeal.reasoning}
+                </p>
+              </div>
+            </div>
+            <div className="text-xs font-mono text-emerald-400 font-bold px-3 py-1 rounded bg-emerald-950/40 border border-emerald-800/40">
+              Targets Met
+            </div>
+          </Card>
+        ) : mealPlan.nextRecommendedMeal.recipe ? (
+          <Card className="p-5 bg-gradient-to-r from-cyan-950/30 via-zinc-950/50 to-zinc-950/30 border-cyan-500/30 relative overflow-hidden" hoverEffect={false}>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-widest text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/30">
+                    <Sparkles className="w-3 h-3 text-cyan-400" />
+                    Recommended Next Meal: {mealPlan.nextRecommendedMeal.mealType}
+                  </span>
+                  <span className="text-[10px] font-mono text-zinc-400">
+                    Remaining: {mealPlan.nextRecommendedMeal.remainingCaloriesBeforeMeal} kcal | {mealPlan.nextRecommendedMeal.remainingProteinBeforeMeal}g P
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-white tracking-wide">
+                  {mealPlan.nextRecommendedMeal.recipe.name}
+                </h3>
+                <p className="text-xs text-zinc-400 max-w-2xl leading-relaxed">
+                  {mealPlan.nextRecommendedMeal.rationale || mealPlan.nextRecommendedMeal.reasoning}
+                </p>
+                <div className="flex items-center gap-3 text-xs font-mono pt-1">
+                  <span className="text-white font-bold">{mealPlan.nextRecommendedMeal.recipe.calories} kcal</span>
+                  <span className="text-zinc-600">•</span>
+                  <span className="text-cyan-300 font-bold">{mealPlan.nextRecommendedMeal.recipe.proteinGrams}g Protein</span>
+                  <span className="text-zinc-600">•</span>
+                  <span className="text-amber-300 font-bold">{mealPlan.nextRecommendedMeal.recipe.carbsGrams}g Carbs</span>
+                  <span className="text-zinc-600">•</span>
+                  <span className="text-red-300 font-bold">{mealPlan.nextRecommendedMeal.recipe.fatGrams}g Fat</span>
+                </div>
+              </div>
+
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => handleAddRecipeToMeal(`m-${mealPlan.nextRecommendedMeal!.mealType.toLowerCase()}`, mealPlan.nextRecommendedMeal!.recipe!)}
+                className="whitespace-nowrap flex items-center gap-2 shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Log to {mealPlan.nextRecommendedMeal.mealType.charAt(0) + mealPlan.nextRecommendedMeal.mealType.slice(1).toLowerCase()}</span>
+              </Button>
+            </div>
+          </Card>
+        ) : null
+      )}
 
       {/* FRIDAY Daily Meal Recommendations (Deterministic Planner) */}
       {mealPlan && (

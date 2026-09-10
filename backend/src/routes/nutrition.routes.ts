@@ -15,6 +15,30 @@ export async function nutritionRoutes(fastify: FastifyInstance) {
     return reply.send({ success: true, ...data });
   });
 
+  // GET /api/nutrition/state
+  fastify.get('/nutrition/state', async (request, reply) => {
+    const userId = request.user!.id;
+    const query = request.query as { date?: string };
+    const state = await NutritionService.getDailyNutritionState(userId, query.date);
+    return reply.send({ success: true, state });
+  });
+
+  // GET /api/nutrition/recommendation
+  fastify.get('/nutrition/recommendation', async (request, reply) => {
+    const userId = request.user!.id;
+    const query = request.query as { mealType?: any; date?: string; preferenceFilter?: any };
+    const recommendation = await NutritionService.getAdaptiveMealRecommendation(userId, query);
+    return reply.send({ success: true, recommendation });
+  });
+
+  // GET /api/nutrition/plan
+  fastify.get('/nutrition/plan', async (request, reply) => {
+    const userId = request.user!.id;
+    const query = request.query as { date?: string };
+    const plan = await NutritionService.getAdaptiveDailyMealPlan(userId, query.date);
+    return reply.send({ success: true, plan });
+  });
+
   // GET /api/nutrition/targets
   fastify.get('/nutrition/targets', async (request, reply) => {
     const userId = request.user!.id;

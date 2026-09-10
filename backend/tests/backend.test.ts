@@ -761,6 +761,108 @@ describe('FRIDAY Backend Integration & Security Tests', () => {
       });
     });
   });
+
+  // 11. Adaptive Nutrition Intelligence & Deterministic API Tests
+  describe('Adaptive Nutrition Intelligence & Endpoints', () => {
+    it('GET /api/nutrition/state returns deterministic state from persisted database data', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/nutrition/state',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.state).toBeDefined();
+      expect(body.state.userId).toBe('user-a');
+      expect(body.state.targets.targetCalories).toBeGreaterThan(0);
+      expect(body.state.targets.proteinGrams).toBeGreaterThan(0);
+      expect(body.state.consumed).toBeDefined();
+      expect(body.state.remaining).toBeDefined();
+      // Invariant: remaining values are clamped non-negative
+      expect(body.state.remaining.calories).toBeGreaterThanOrEqual(0);
+      expect(body.state.remaining.protein).toBeGreaterThanOrEqual(0);
+      expect(body.state.remaining.carbs).toBeGreaterThanOrEqual(0);
+      expect(body.state.remaining.fat).toBeGreaterThanOrEqual(0);
+      expect(body.state.workoutStatus).toBeDefined();
+      expect(body.state.onTrackStatus).toBeDefined();
+      expect(body.state.nextMealType).toBeDefined();
+    });
+
+    it('GET /api/nutrition/state enforces user isolation between User A and User B', async () => {
+      const resA = await app.inject({
+        method: 'GET',
+        url: '/api/nutrition/state',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+      const resB = await app.inject({
+        method: 'GET',
+        url: '/api/nutrition/state',
+        headers: { authorization: `Bearer ${userBToken}` }
+      });
+      expect(resA.statusCode).toBe(200);
+      expect(resB.statusCode).toBe(200);
+
+      const bodyA = JSON.parse(resA.body);
+      const bodyB = JSON.parse(resB.body);
+      expect(bodyA.state.userId).toBe('user-a');
+      expect(bodyB.state.userId).toBe('user-b');
+    });
+
+    it('GET /api/nutrition/recommendation returns deterministic recommendation matching remaining budget', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/nutrition/recommendation?mealType=DINNER',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.recommendation).toBeDefined();
+      expect(body.recommendation.mealType).toBe('DINNER');
+      expect(body.recommendation.recipe).not.toBeNull();
+      expect(body.recommendation.recipe.calories).toBeGreaterThan(0);
+      expect(body.recommendation.rationale).toBeDefined();
+      expect(body.recommendation.status).toBe('RECOMMENDED');
+    });
+
+    it('GET /api/nutrition/plan returns full 4-meal plan with next recommended meal', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/nutrition/plan',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.plan.breakfast).toBeDefined();
+      expect(body.plan.lunch).toBeDefined();
+      expect(body.plan.snack).toBeDefined();
+      expect(body.plan.dinner).toBeDefined();
+      expect(body.plan.totalCalories).toBeGreaterThan(1500);
+      expect(body.plan.totalProtein).toBeGreaterThan(80);
+      expect(body.plan.nextRecommendedMeal).toBeDefined();
+    });
+
+    it('FRIDAY tool getDailyNutritionState returns real state', async () => {
+      const { executeBackendTool } = await import('../src/modules/friday/tools/fridayTools.js');
+      const result: any = await executeBackendTool('user-a', 'getDailyNutritionState', {});
+      expect(result).toBeDefined();
+      expect(result.userId).toBe('user-a');
+      expect(result.targets.targetCalories).toBeGreaterThan(0);
+      expect(result.remaining.calories).toBeGreaterThanOrEqual(0);
+    });
+
+    it('FRIDAY tool getMealRecommendation returns deterministic meal recommendation', async () => {
+      const { executeBackendTool } = await import('../src/modules/friday/tools/fridayTools.js');
+      const result: any = await executeBackendTool('user-a', 'getMealRecommendation', { mealType: 'LUNCH' });
+      expect(result).toBeDefined();
+      expect(result.mealType).toBe('LUNCH');
+      expect(result.recipe).not.toBeNull();
+      expect(result.recipe.calories).toBeGreaterThan(0);
+    });
+  });
 });
+
 
 

@@ -66,6 +66,28 @@ export const FRIDAY_TOOL_DEFINITIONS: ToolDefinition[] = [
     }
   },
   {
+    name: 'getDailyNutritionState',
+    description: 'Retrieves authoritative daily nutrition state: target calories and macros, consumed calories and macros, remaining calories and macros, logged meals, next recommended meal slot, workout completion status, and on-track evaluation for the authenticated user.',
+    parameters: {
+      type: 'object',
+      properties: {
+        date: { type: 'string', description: 'Date in YYYY-MM-DD format (defaults to today)' }
+      }
+    }
+  },
+  {
+    name: 'getMealRecommendation',
+    description: 'Calculates a deterministic adaptive meal recommendation for a specific meal (or next meal slot) calibrated to remaining daily calories and macros, dietary preferences (STANDARD, VEGETARIAN, VEGAN, KETO, PALEO), allergies, intolerances, and today workout recovery status.',
+    parameters: {
+      type: 'object',
+      properties: {
+        mealType: { type: 'string', description: 'Target meal slot: "BREAKFAST", "LUNCH", "SNACK", "DINNER", or "NEXT"' },
+        preferenceFilter: { type: 'string', description: 'Optional dietary or nutritional filter: "HIGH_PROTEIN", "VEGETARIAN", "VEGAN", "KETO", or "LOW_CALORIE"' },
+        date: { type: 'string', description: 'Date in YYYY-MM-DD format' }
+      }
+    }
+  },
+  {
     name: 'logMeal',
     description: 'Logs a meal or food item for the authenticated user.',
     parameters: {
@@ -190,6 +212,16 @@ export async function executeBackendTool(
       const targets = await NutritionService.getTargets(userId);
       const meals = await NutritionService.getTodayMeals(userId, args.date);
       return { targets, ...meals };
+    }
+    case 'getDailyNutritionState': {
+      return NutritionService.getDailyNutritionState(userId, args.date);
+    }
+    case 'getMealRecommendation': {
+      return NutritionService.getAdaptiveMealRecommendation(userId, {
+        mealType: args.mealType,
+        preferenceFilter: args.preferenceFilter,
+        date: args.date
+      });
     }
     case 'logMeal': {
       if (!args.name || typeof args.totalCalories !== 'number') {

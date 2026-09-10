@@ -1,5 +1,20 @@
 import { NutritionRepository, MealEntity, NutritionTargetsEntity } from '../repositories/nutrition.repo.js';
 import { ProfileRepository } from '../repositories/profile.repo.js';
+import { WorkoutsRepository } from '../repositories/workouts.repo.js';
+import {
+  generateAdaptiveMealRecommendation,
+  generateAdaptiveDailyMealPlan,
+  getNextMealType
+} from '../modules/nutrition/adaptive/nutritionPlanner.js';
+import {
+  DailyNutritionState,
+  AdaptiveMealRecommendation,
+  AdaptiveDailyMealPlan,
+  WorkoutStatus,
+  OnTrackStatus,
+  MacroSplit,
+  MealType
+} from '../modules/nutrition/adaptive/types.js';
 
 export class NutritionService {
   static calculateTargets(weightKg: number, heightCm: number, age: number, sex: string, activityLevel: string, goal: string): NutritionTargetsEntity {
@@ -110,5 +125,170 @@ export class NutritionService {
 
   static async deleteMeal(userId: string, mealId: string): Promise<boolean> {
     return NutritionRepository.deleteMeal(userId, mealId);
+  }
+
+  static async getDailyNutritionState(userId: string, date?: string): Promise<DailyNutritionState> {
+    const today = date || new Date().toISOString().split('T')[0];
+    const targets = await this.getTargets(userId);
+    const mealsData = await this.getTodayMeals(userId, today);
+    const profile = await ProfileRepository.getProfile(userId);
+
+    // Workout status calculation from real database records
+    const sessions = await WorkoutsRepository.getSessions(userId);
+    const todaySessions = sessions.filter(s => s.date === today);
+    let workoutStatus: WorkoutStatus = 'NOT_COMPLETED';
+
+    if (todaySessions.some(s => s.completed)) {
+      workoutStatus = 'COMPLETED';
+    } else if (todaySessions.some(s => !s.completed)) {
+      workoutStatus = 'PLANNED';
+    } else {
+      const dayOfWeek = new Date(today).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+      const plannedDays = (profile?.availableWorkoutDays || []).map(d => d.toUpperCase());
+      if (plannedDays.includes(dayOfWeek)) {
+        workoutStatus = 'PLANNED';
+      } else {
+        workoutStatus = 'REST_DAY';
+      }
+    }
+
+    const caloriesConsumed = mealsData.totals.calories;
+    const proteinConsumed = mealsData.totals.protein;
+    const carbsConsumed = mealsData.totals.carbs;
+    const fatConsumed = mealsData.totals.fat;
+
+    const caloriesRemaining = Math.max(0, targets.targetCalories - caloriesConsumed);
+    const proteinRemaining = Math.max(0, targets.proteinGrams - proteinConsumed);
+    const carbsRemaining = Math.max(0, targets.carbsGrams - carbsConsumed);
+    const fatRemaining = Math.max(0, targets.fatGrams - fatConsumed);
+
+    const loggedMealTypes = mealsData.meals
+      .filter(m => (m.items && m.items.length > 0) || m.totalCalories > 0)
+      .map(m => m.type);
+
+    const nextMealType = getNextMealType(loggedMealTypes);
+
+    let onTrackStatus: OnTrackStatus = 'ON_TRACK';
+    if (caloriesConsumed > targets.targetCalories + 150) {
+      onTrackStatus = 'OVER_CALORIES';
+    } else if (caloriesConsumed < targets.targetCalories * 0.4 && nextMealType === 'DAILY_COMPLETE') {
+      onTrackStatus = 'UNDER_CALORIES';
+    } else if (proteinRemaining > targets.proteinGrams * 0.45 && nextMealType === 'DAILY_COMPLETE') {
+      onTrackStatus = 'PROTEIN_DEFICIT';
+    }
+
+    return {
+      userId,
+      date: today,
+      targets: {
+        targetCalories: targets.targetCalories,
+        proteinGrams: targets.proteinGrams,
+        carbsGrams: targets.carbsGrams,
+        fatGrams: targets.fatGrams,
+        maintenanceCalories: targets.maintenanceCalories,
+        bmr: targets.bmr
+      },
+      consumed: {
+        calories: caloriesConsumed,
+        protein: proteinConsumed,
+        carbs: carbsConsumed,
+        fat: fatConsumed
+      },
+      remaining: {
+        calories: caloriesRemaining,
+        protein: proteinRemaining,
+        carbs: carbsRemaining,
+        fat: fatRemaining
+      },
+      meals: mealsData.meals,
+      loggedMealTypes,
+      nextMealType,
+      workoutStatus,
+      onTrackStatus
+    };
+  }
+
+  static async getAdaptiveMealRecommendation(
+    userId: string,
+    options: {
+      mealType?: MealType | 'NEXT';
+      date?: string;
+      preferenceFilter?: 'HIGH_PROTEIN' | 'VEGETARIAN' | 'VEGAN' | 'KETO' | 'LOW_CALORIE';
+    } = {}
+  ): Promise<AdaptiveMealRecommendation | null> {
+    const state = await this.getDailyNutritionState(userId, options.date);
+    const profile = await ProfileRepository.getProfile(userId);
+
+    const userContext = {
+      dietPreference: profile?.dietPreference,
+      allergies: profile?.allergies,
+      intolerances: profile?.intolerances,
+      foodPreferences: profile?.foodPreferences,
+      goal: profile?.goal
+    };
+
+    const targetMacros: MacroSplit = {
+      calories: state.targets.targetCalories,
+      protein: state.targets.proteinGrams,
+      carbs: state.targets.carbsGrams,
+      fat: state.targets.fatGrams
+    };
+
+    const consumedMacros: MacroSplit = {
+      calories: state.consumed.calories,
+      protein: state.consumed.protein,
+      carbs: state.consumed.carbs,
+      fat: state.consumed.fat
+    };
+
+    return generateAdaptiveMealRecommendation(
+      userContext,
+      targetMacros,
+      consumedMacros,
+      state.loggedMealTypes,
+      {
+        mealType: options.mealType,
+        workoutStatus: state.workoutStatus,
+        preferenceFilter: options.preferenceFilter
+      }
+    );
+  }
+
+  static async getAdaptiveDailyMealPlan(
+    userId: string,
+    date?: string
+  ): Promise<AdaptiveDailyMealPlan> {
+    const state = await this.getDailyNutritionState(userId, date);
+    const profile = await ProfileRepository.getProfile(userId);
+
+    const userContext = {
+      dietPreference: profile?.dietPreference,
+      allergies: profile?.allergies,
+      intolerances: profile?.intolerances,
+      foodPreferences: profile?.foodPreferences,
+      goal: profile?.goal
+    };
+
+    const targetMacros: MacroSplit = {
+      calories: state.targets.targetCalories,
+      protein: state.targets.proteinGrams,
+      carbs: state.targets.carbsGrams,
+      fat: state.targets.fatGrams
+    };
+
+    const consumedMacros: MacroSplit = {
+      calories: state.consumed.calories,
+      protein: state.consumed.protein,
+      carbs: state.consumed.carbs,
+      fat: state.consumed.fat
+    };
+
+    return generateAdaptiveDailyMealPlan(
+      userContext,
+      targetMacros,
+      consumedMacros,
+      state.loggedMealTypes,
+      state.workoutStatus
+    );
   }
 }

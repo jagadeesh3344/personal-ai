@@ -12,6 +12,28 @@ export const nutritionApi = {
     return res.targets;
   },
 
+  async getState(date?: string) {
+    const query = date ? `?date=${encodeURIComponent(date)}` : '';
+    const res = await apiClient.get<{ success: boolean; state: any }>(`/nutrition/state${query}`);
+    return res.state;
+  },
+
+  async getRecommendation(options?: { mealType?: string; date?: string; preferenceFilter?: string }) {
+    const params = new URLSearchParams();
+    if (options?.mealType) params.append('mealType', options.mealType);
+    if (options?.date) params.append('date', options.date);
+    if (options?.preferenceFilter) params.append('preferenceFilter', options.preferenceFilter);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await apiClient.get<{ success: boolean; recommendation: any }>(`/nutrition/recommendation${qs}`);
+    return res.recommendation;
+  },
+
+  async getPlan(date?: string) {
+    const query = date ? `?date=${encodeURIComponent(date)}` : '';
+    const res = await apiClient.get<{ success: boolean; plan: any }>(`/nutrition/plan${query}`);
+    return res.plan;
+  },
+
   async createMeal(meal: Omit<Meal, 'id'>): Promise<Meal> {
     const res = await apiClient.post<{ success: boolean; meal: Meal }>('/nutrition/meals', meal);
     return res.meal;

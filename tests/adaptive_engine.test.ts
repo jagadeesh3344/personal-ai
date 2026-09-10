@@ -18,33 +18,41 @@ describe('Deterministic Adaptive Workout & Progression Engine', () => {
   const beginnerNoEquipProfile: UserProfile = {
     name: 'Beginner Athlete',
     age: 25,
-    gender: 'MALE',
-    weightKg: 70,
+    sex: 'MALE',
+    currentWeightKg: 70,
     heightCm: 175,
     goal: 'GENERAL_FITNESS',
     activityLevel: 'SEDENTARY',
     trainingExperience: 'BEGINNER',
     equipment: ['NONE'],
     trainingEnvironment: 'HOME',
-    workoutFrequency: 3,
     targetWeightKg: 70,
-    availableWorkoutDays: ['MON', 'WED', 'FRI']
+    availableWorkoutDays: ['MON', 'WED', 'FRI'],
+    preferredWorkoutDuration: 45,
+    dietPreference: 'STANDARD',
+    foodPreferences: [],
+    allergies: [],
+    intolerances: []
   };
 
   const intermediateEquipProfile: UserProfile = {
     name: 'Intermediate Lifter',
     age: 28,
-    gender: 'FEMALE',
-    weightKg: 65,
+    sex: 'FEMALE',
+    currentWeightKg: 65,
     heightCm: 168,
     goal: 'GAIN_MUSCLE',
-    activityLevel: 'MODERATE',
+    activityLevel: 'MODERATELY_ACTIVE',
     trainingExperience: 'INTERMEDIATE',
     equipment: ['DUMBBELLS', 'BENCH'],
     trainingEnvironment: 'HOME',
-    workoutFrequency: 3,
     targetWeightKg: 65,
-    availableWorkoutDays: ['MON', 'WED', 'FRI']
+    availableWorkoutDays: ['MON', 'WED', 'FRI'],
+    preferredWorkoutDuration: 45,
+    dietPreference: 'STANDARD',
+    foodPreferences: [],
+    allergies: [],
+    intolerances: []
   };
 
   // Helper to create mock set items
