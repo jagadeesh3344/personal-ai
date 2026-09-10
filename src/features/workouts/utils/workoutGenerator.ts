@@ -4,10 +4,22 @@ import { getAvailableExercises } from './equipmentFilter';
 import { WorkoutPlan, WorkoutDay, WorkoutExercise, WorkoutSet } from '../../../types';
 
 export function generateWorkout(profile: UserProfile): WorkoutPlan {
-  const availablePool = getAvailableExercises(profile, EXERCISES);
-
-  const goal = profile.goal || 'GENERAL_FITNESS';
+  const rawPool = getAvailableExercises(profile, EXERCISES);
   const experience = profile.trainingExperience || 'BEGINNER';
+
+  // Strict experience gating:
+  // - BEGINNER: Only BEGINNER difficulty exercises. No intermediate/advanced variations (no Diamond Push-up).
+  // - INTERMEDIATE: BEGINNER and INTERMEDIATE difficulty exercises.
+  // - ADVANCED: All difficulties unlocked.
+  const availablePool = rawPool.filter(ex => {
+    if (experience === 'BEGINNER') {
+      return ex.difficulty === 'BEGINNER';
+    }
+    if (experience === 'INTERMEDIATE') {
+      return ex.difficulty === 'BEGINNER' || ex.difficulty === 'INTERMEDIATE';
+    }
+    return true;
+  });
   const availableDays = (profile.availableWorkoutDays && profile.availableWorkoutDays.length > 0)
     ? profile.availableWorkoutDays
     : ['MON', 'WED', 'FRI'];
@@ -15,6 +27,7 @@ export function generateWorkout(profile: UserProfile): WorkoutPlan {
   let targetReps = '10-12 reps';
   let restSeconds = 60;
   let targetSets = experience === 'BEGINNER' ? 3 : 4;
+  const goal = profile.goal;
 
   switch (goal) {
     case 'STRENGTH':

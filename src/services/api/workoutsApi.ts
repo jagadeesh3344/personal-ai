@@ -16,7 +16,20 @@ export const workoutsApi = {
     return res.session;
   },
 
-  async addSet(sessionId: string, setData: { exerciseId: string; setNumber: number; weightKg: number; reps: number; completed?: boolean }): Promise<WorkoutSet> {
+  async addSet(
+    sessionId: string, 
+    setData: { 
+      exerciseId: string; 
+      setNumber: number; 
+      weightKg: number; 
+      reps: number; 
+      durationSeconds?: number;
+      resistanceLevel?: string;
+      completed?: boolean;
+      completionMethod?: 'CAMERA' | 'VOICE' | 'MANUAL';
+      verification?: 'VERIFIED' | 'SELF_REPORTED';
+    }
+  ): Promise<WorkoutSet> {
     const res = await apiClient.post<{ success: boolean; set: WorkoutSet }>(`/workout-sessions/${sessionId}/sets`, setData);
     return res.set;
   },

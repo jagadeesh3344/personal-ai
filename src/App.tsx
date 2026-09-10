@@ -302,6 +302,7 @@ export default function App() {
             onAddWater={handleAddWater}
             onDeleteWaterEntry={handleDeleteWaterEntry}
             setTab={setCurrentTab}
+            userProfile={userProfile}
           />
         );
       case 'habits':

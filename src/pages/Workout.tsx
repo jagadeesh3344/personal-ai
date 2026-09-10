@@ -68,11 +68,15 @@ export const Workout: React.FC<WorkoutProps> = ({
   // Derive active exercise list from session if running, or default plan day
   const currentExercises: WorkoutExercise[] = activeSession?.exercises || currentDay?.exercises || [];
 
-  const handleToggleSet = (exerciseId: string, setId: string) => {
+  const handleToggleSet = async (exerciseId: string, setId: string) => {
     if (!activeSession) return;
+
+    let targetSet: WorkoutSet | undefined;
+    let targetEx: WorkoutExercise | undefined;
 
     const updatedExercises = activeSession.exercises.map(ex => {
       if (ex.id === exerciseId) {
+        targetEx = ex;
         const updatedSets = ex.sets.map(s => {
           if (s.id === setId) {
             const nextCompleted = !s.completed;
@@ -80,11 +84,15 @@ export const Workout: React.FC<WorkoutProps> = ({
               resetTimer(ex.restSeconds || 60);
               setTimerActive(true);
             }
-            return {
+            const updated: WorkoutSet = {
               ...s,
               completed: nextCompleted,
+              completionMethod: nextCompleted ? 'MANUAL' : undefined,
+              verification: nextCompleted ? 'SELF_REPORTED' : undefined,
               completedAt: nextCompleted ? new Date().toISOString() : undefined
             };
+            targetSet = updated;
+            return updated;
           }
           return s;
         });
@@ -97,6 +105,25 @@ export const Workout: React.FC<WorkoutProps> = ({
       ...activeSession,
       exercises: updatedExercises
     });
+
+    // If marked completed, persist authoritative set record to backend DB
+    if (targetSet?.completed && targetEx) {
+      try {
+        await workoutsApi.addSet(activeSession.id, {
+          exerciseId: targetEx.exerciseId || targetEx.id,
+          setNumber: targetSet.setNumber,
+          weightKg: targetSet.weightKg || 0,
+          reps: targetSet.reps || 10,
+          durationSeconds: targetSet.durationSeconds,
+          resistanceLevel: targetSet.resistanceLevel,
+          completed: true,
+          completionMethod: 'MANUAL',
+          verification: 'SELF_REPORTED'
+        });
+      } catch (err) {
+        console.warn('[Workout] backend manual set sync warning:', err);
+      }
+    }
   };
 
   const handleUpdateSet = (exerciseId: string, setId: string, field: 'weightKg' | 'reps' | 'durationSeconds' | 'resistanceLevel', value: any) => {
@@ -216,7 +243,9 @@ export const Workout: React.FC<WorkoutProps> = ({
         setNumber: loggedSetNumber,
         weightKg: currentEx?.sets[0]?.weightKg || 0,
         reps,
-        completed: true
+        completed: true,
+        completionMethod: 'CAMERA',
+        verification: 'VERIFIED'
       });
     } catch (err) {
       console.warn('[Workout] Notice: backend set sync handled or in offline mode', err);
@@ -229,7 +258,14 @@ export const Workout: React.FC<WorkoutProps> = ({
         const updatedSets = ex.sets.map(s => {
           if (!s.completed && !setMarked) {
             setMarked = true;
-            return { ...s, reps, completed: true, completedAt: new Date().toISOString() };
+            return { 
+              ...s, 
+              reps, 
+              completed: true, 
+              completionMethod: 'CAMERA' as const,
+              verification: 'VERIFIED' as const,
+              completedAt: new Date().toISOString() 
+            };
           }
           return s;
         });
@@ -241,6 +277,8 @@ export const Workout: React.FC<WorkoutProps> = ({
             weightKg: ex.sets[ex.sets.length - 1]?.weightKg || 0,
             reps,
             completed: true,
+            completionMethod: 'CAMERA' as const,
+            verification: 'VERIFIED' as const,
             completedAt: new Date().toISOString()
           });
         }
@@ -378,6 +416,10 @@ export const Workout: React.FC<WorkoutProps> = ({
             onAddSet={handleAddSet}
             onDeleteSet={handleDeleteSet}
             onDeleteExercise={handleDeleteExercise}
+            onStartCamera={(ex) => {
+              setActiveCameraExercise(ex);
+              setIsCameraActive(true);
+            }}
           />
         ))}
 

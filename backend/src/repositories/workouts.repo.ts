@@ -23,6 +23,8 @@ export interface WorkoutSetEntity {
   reps: number;
   completed: boolean;
   rpe?: number;
+  completionMethod?: 'CAMERA' | 'VOICE' | 'MANUAL';
+  verification?: 'VERIFIED' | 'SELF_REPORTED';
 }
 
 const memorySessions = new Map<string, WorkoutSessionEntity[]>();
@@ -111,7 +113,16 @@ export class WorkoutsRepository {
   static async addSet(
     userId: string, 
     sessionId: string, 
-    setData: { exerciseId: string; setNumber: number; weightKg: number; reps: number; completed?: boolean; rpe?: number }, 
+    setData: { 
+      exerciseId: string; 
+      setNumber: number; 
+      weightKg: number; 
+      reps: number; 
+      completed?: boolean; 
+      rpe?: number;
+      completionMethod?: 'CAMERA' | 'VOICE' | 'MANUAL';
+      verification?: 'VERIFIED' | 'SELF_REPORTED';
+    }, 
     client?: SupabaseClient
   ): Promise<WorkoutSetEntity> {
     const newSet: WorkoutSetEntity = {
@@ -122,7 +133,9 @@ export class WorkoutsRepository {
       weightKg: setData.weightKg,
       reps: setData.reps,
       completed: setData.completed ?? false,
-      rpe: setData.rpe
+      rpe: setData.rpe,
+      completionMethod: setData.completionMethod || 'MANUAL',
+      verification: setData.verification || 'SELF_REPORTED'
     };
 
     if (process.env.NODE_ENV === 'test' || !process.env.SUPABASE_URL || process.env.SUPABASE_URL.includes('placeholder')) {

@@ -98,7 +98,16 @@ export class WorkoutsService {
   static async addSet(
     userId: string, 
     sessionId: string, 
-    setData: { exerciseId: string; setNumber: number; weightKg: number; reps: number; completed?: boolean; rpe?: number }
+    setData: { 
+      exerciseId: string; 
+      setNumber: number; 
+      weightKg: number; 
+      reps: number; 
+      completed?: boolean; 
+      rpe?: number;
+      completionMethod?: 'CAMERA' | 'VOICE' | 'MANUAL';
+      verification?: 'VERIFIED' | 'SELF_REPORTED';
+    }
   ): Promise<WorkoutSetEntity> {
     // Validate exercise equipment against profile
     const profile = await ProfileRepository.getProfile(userId);

@@ -23,19 +23,104 @@ export interface Exercise {
   defaultReps?: string;
   defaultSets?: number;
   restSeconds?: number;
+  tutorialUrl?: string;
+  safetyNotes?: string;
+  progressionId?: string;
+  regressionId?: string;
 }
 
 
 export const EXERCISES: Exercise[] = [
   // --- BODYWEIGHT / NO EQUIPMENT (HOME, GYM, OUTDOOR) ---
   {
+    id: "wall-push-up",
+    name: "Wall Push-up",
+    equipmentRequired: ["NONE"],
+    environment: ["HOME", "GYM", "OUTDOOR"],
+    muscleGroups: ["CHEST", "TRICEPS", "SHOULDERS"],
+    difficulty: "BEGINNER",
+    instructions: "Stand arms-length from a wall. Place palms flat, bend elbows to bring chest close to wall, then press back.",
+    safetyNotes: "Keep body straight from head to heels. Do not arch your lower back.",
+    tutorialUrl: "https://www.acefitness.org/resources/everyone/exercise-library/41/wall-push-up/",
+    progressionId: "incline-push-up",
+    defaultReps: "10-15 reps",
+    defaultSets: 3,
+    restSeconds: 45
+  },
+  {
+    id: "incline-push-up",
+    name: "Incline Push-up",
+    equipmentRequired: ["NONE"],
+    environment: ["HOME", "GYM", "OUTDOOR"],
+    muscleGroups: ["CHEST", "TRICEPS", "SHOULDERS"],
+    difficulty: "BEGINNER",
+    instructions: "Place hands on an elevated sturdy surface (bench, table, or step). Lower chest to the edge and press away.",
+    safetyNotes: "Ensure the surface is stable and will not slide.",
+    tutorialUrl: "https://www.acefitness.org/resources/everyone/exercise-library/42/incline-push-up/",
+    regressionId: "wall-push-up",
+    progressionId: "knee-push-up",
+    defaultReps: "10-12 reps",
+    defaultSets: 3,
+    restSeconds: 60
+  },
+  {
+    id: "knee-push-up",
+    name: "Knee Push-up",
+    equipmentRequired: ["NONE"],
+    environment: ["HOME", "GYM", "OUTDOOR"],
+    muscleGroups: ["CHEST", "TRICEPS", "SHOULDERS"],
+    difficulty: "BEGINNER",
+    instructions: "Rest on knees and hands with hips extended. Lower chest to floor with elbows 45 degrees, then press up.",
+    safetyNotes: "Keep core engaged to maintain a straight line from knees to shoulders.",
+    tutorialUrl: "https://www.acefitness.org/resources/everyone/exercise-library/43/modified-push-up/",
+    regressionId: "incline-push-up",
+    progressionId: "push-up",
+    defaultReps: "8-12 reps",
+    defaultSets: 3,
+    restSeconds: 60
+  },
+  {
+    id: "box-squat",
+    name: "Box Squat",
+    equipmentRequired: ["NONE"],
+    environment: ["HOME", "GYM", "OUTDOOR"],
+    muscleGroups: ["LEGS"],
+    difficulty: "BEGINNER",
+    instructions: "Stand in front of a chair or box. Hinge at hips and sit down until glutes gently touch, then drive through heels to stand.",
+    safetyNotes: "Do not collapse onto the seat; maintain core tension throughout the descent.",
+    tutorialUrl: "https://www.acefitness.org/resources/everyone/exercise-library/134/box-squat/",
+    progressionId: "bodyweight-squat",
+    defaultReps: "10-12 reps",
+    defaultSets: 3,
+    restSeconds: 60
+  },
+  {
+    id: "knee-plank",
+    name: "Knee Plank",
+    equipmentRequired: ["NONE"],
+    environment: ["HOME", "GYM", "OUTDOOR"],
+    muscleGroups: ["CORE"],
+    difficulty: "BEGINNER",
+    instructions: "Support body on forearms and knees. Keep hips aligned with shoulders and brace abdominal wall.",
+    safetyNotes: "Breathe steadily. Do not let hips drop below shoulder level.",
+    tutorialUrl: "https://www.acefitness.org/resources/everyone/exercise-library/33/modified-front-plank/",
+    progressionId: "plank",
+    defaultReps: "20-30 sec",
+    defaultSets: 3,
+    restSeconds: 45
+  },
+  {
     id: "push-up",
     name: "Push-up",
     equipmentRequired: ["NONE"],
     environment: ["HOME", "GYM", "OUTDOOR"],
     muscleGroups: ["CHEST", "TRICEPS", "SHOULDERS"],
-    difficulty: "BEGINNER",
+    difficulty: "INTERMEDIATE",
     instructions: "Keep core tight, lower chest to floor with elbows 45 degrees, and push back up.",
+    safetyNotes: "Keep neck neutral and maintain a rigid plank posture throughout.",
+    tutorialUrl: "https://www.acefitness.org/resources/everyone/exercise-library/40/push-up/",
+    regressionId: "knee-push-up",
+    progressionId: "diamond-push-up",
     defaultReps: "10-15 reps",
     defaultSets: 3,
     restSeconds: 60
@@ -46,8 +131,11 @@ export const EXERCISES: Exercise[] = [
     equipmentRequired: ["NONE"],
     environment: ["HOME", "GYM", "OUTDOOR"],
     muscleGroups: ["TRICEPS", "CHEST"],
-    difficulty: "INTERMEDIATE",
+    difficulty: "ADVANCED",
     instructions: "Place hands together under chest forming a diamond. Lower chest to hands and press.",
+    safetyNotes: "Places high stress on wrists and elbows. Progress to this only after mastering standard push-ups.",
+    tutorialUrl: "https://www.acefitness.org/resources/everyone/exercise-library/235/close-grip-push-up/",
+    regressionId: "push-up",
     defaultReps: "8-12 reps",
     defaultSets: 3,
     restSeconds: 60
@@ -72,6 +160,10 @@ export const EXERCISES: Exercise[] = [
     muscleGroups: ["LEGS"],
     difficulty: "BEGINNER",
     instructions: "Feet shoulder-width apart. Sit hips back and down to parallel, keeping chest high.",
+    safetyNotes: "Drive knees out in line with toes. Keep entire foot grounded on the floor.",
+    tutorialUrl: "https://www.acefitness.org/resources/everyone/exercise-library/135/bodyweight-squat/",
+    regressionId: "box-squat",
+    progressionId: "dumbbell-goblet-squat",
     defaultReps: "15-20 reps",
     defaultSets: 3,
     restSeconds: 60

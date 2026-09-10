@@ -73,8 +73,12 @@ export const WorkoutSetCreateSchema = z.object({
   setNumber: z.number().int().min(1),
   weightKg: z.number().min(0),
   reps: z.number().int().min(0),
+  durationSeconds: z.number().int().min(0).optional(),
+  resistanceLevel: z.string().optional(),
   completed: z.boolean().default(false),
-  rpe: z.number().min(1).max(10).optional()
+  rpe: z.number().min(1).max(10).optional(),
+  completionMethod: z.enum(['CAMERA', 'VOICE', 'MANUAL']).default('MANUAL').optional(),
+  verification: z.enum(['VERIFIED', 'SELF_REPORTED']).default('SELF_REPORTED').optional()
 });
 
 export const MealItemSchema = z.object({

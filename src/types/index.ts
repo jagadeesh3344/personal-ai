@@ -26,6 +26,9 @@ export interface ExerciseDefinition {
   trackingType?: TrackingType;
 }
 
+export type CompletionMethod = 'CAMERA' | 'VOICE' | 'MANUAL';
+export type VerificationStatus = 'VERIFIED' | 'SELF_REPORTED';
+
 export interface WorkoutSet {
   id: string;
   setNumber: number;
@@ -35,6 +38,8 @@ export interface WorkoutSet {
   resistanceLevel?: string;
   completed: boolean;
   completedAt?: string;
+  completionMethod?: CompletionMethod;
+  verification?: VerificationStatus;
 }
 
 export interface WorkoutExercise {

@@ -30,6 +30,11 @@ export const NutritionCard: React.FC<NutritionCardProps> = ({
   const carbPct = Math.min(100, Math.round((currentCarbs / targetCarbs) * 100));
   const fatPct = Math.min(100, Math.round((currentFat / targetFat) * 100));
 
+  const remainingCal = targetCalories - currentCalories;
+  const remainingProt = targetProtein - currentProtein;
+  const remainingCarbs = targetCarbs - currentCarbs;
+  const remainingFat = targetFat - currentFat;
+
   return (
     <Card className="p-5 flex flex-col justify-between h-full bg-zinc-950/40 border-zinc-850" hoverEffect={true}>
       <div>
@@ -52,8 +57,11 @@ export const NutritionCard: React.FC<NutritionCardProps> = ({
             </span>
           </div>
           <ProgressBar value={currentCalories} max={targetCalories} color="emerald" />
-          <div className="text-[10px] text-zinc-500 mt-1">
-            {currentCalories === 0 ? '0 kcal logged today' : `${calPct}% of daily caloric allowance`}
+          <div className="flex justify-between text-[10px] text-zinc-500 mt-1.5 font-mono">
+            <span>{currentCalories === 0 ? '0 kcal logged' : `${calPct}% reached`}</span>
+            <span className={remainingCal < 0 ? 'text-amber-400' : 'text-emerald-400'}>
+              {remainingCal >= 0 ? `${remainingCal} kcal remaining` : `${Math.abs(remainingCal)} kcal over`}
+            </span>
           </div>
         </div>
 
@@ -63,7 +71,12 @@ export const NutritionCard: React.FC<NutritionCardProps> = ({
           <div>
             <div className="flex justify-between text-xs text-zinc-400 mb-1">
               <span className="font-semibold text-zinc-300">Protein</span>
-              <span className="font-mono text-zinc-200">{currentProtein} / {targetProtein}g <span className="text-[10px] text-zinc-500">({protPct}%)</span></span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-zinc-200">{currentProtein} / {targetProtein}g</span>
+                <span className={`font-mono text-[10px] ${remainingProt <= 0 ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                  ({remainingProt > 0 ? `${remainingProt}g left` : 'Target met'})
+                </span>
+              </div>
             </div>
             <ProgressBar value={currentProtein} max={targetProtein} color="cyan" />
           </div>
@@ -72,7 +85,12 @@ export const NutritionCard: React.FC<NutritionCardProps> = ({
           <div>
             <div className="flex justify-between text-xs text-zinc-400 mb-1">
               <span className="font-semibold text-zinc-300">Carbs</span>
-              <span className="font-mono text-zinc-200">{currentCarbs} / {targetCarbs}g <span className="text-[10px] text-zinc-500">({carbPct}%)</span></span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-zinc-200">{currentCarbs} / {targetCarbs}g</span>
+                <span className={`font-mono text-[10px] ${remainingCarbs < 0 ? 'text-amber-400' : 'text-zinc-500'}`}>
+                  ({remainingCarbs >= 0 ? `${remainingCarbs}g left` : `${Math.abs(remainingCarbs)}g over`})
+                </span>
+              </div>
             </div>
             <ProgressBar value={currentCarbs} max={targetCarbs} color="amber" />
           </div>
@@ -81,7 +99,12 @@ export const NutritionCard: React.FC<NutritionCardProps> = ({
           <div>
             <div className="flex justify-between text-xs text-zinc-400 mb-1">
               <span className="font-semibold text-zinc-300">Fat</span>
-              <span className="font-mono text-zinc-200">{currentFat} / {targetFat}g <span className="text-[10px] text-zinc-500">({fatPct}%)</span></span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-zinc-200">{currentFat} / {targetFat}g</span>
+                <span className={`font-mono text-[10px] ${remainingFat < 0 ? 'text-amber-400' : 'text-zinc-500'}`}>
+                  ({remainingFat >= 0 ? `${remainingFat}g left` : `${Math.abs(remainingFat)}g over`})
+                </span>
+              </div>
             </div>
             <ProgressBar value={currentFat} max={targetFat} color="red" />
           </div>

@@ -12,7 +12,10 @@ import {
   ShieldAlert, 
   Activity, 
   Volume2, 
-  VolumeX 
+  VolumeX,
+  ExternalLink,
+  BookOpen,
+  ShieldCheck
 } from 'lucide-react';
 import { WorkoutExercise } from '../../types';
 import { UserProfile } from '../../types/profile';
@@ -20,6 +23,7 @@ import { MediaPipePoseProvider } from '../../features/camera/MediaPipePoseProvid
 import { resolveExerciseAnalyzer } from '../../features/camera/analyzers/analyzerRegistry';
 import { ExerciseAnalyzer } from '../../features/camera/analyzers/ExerciseAnalyzer';
 import { FormQuality, RepPhase } from '../../features/camera/types';
+import { EXERCISES } from '../../features/workouts/data/exercises';
 
 interface WorkoutCameraProps {
   exercise: WorkoutExercise | null;
@@ -40,6 +44,9 @@ export const WorkoutCamera: React.FC<WorkoutCameraProps> = ({
   onSkipExercise,
   onClose
 }) => {
+  // Educational briefing state
+  const [showTutorial, setShowTutorial] = useState(true);
+
   // Video & Canvas Refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -59,6 +66,9 @@ export const WorkoutCamera: React.FC<WorkoutCameraProps> = ({
   const [formQuality, setFormQuality] = useState<FormQuality>('GOOD');
   const [coachCue, setCoachCue] = useState('Position your body in view to begin.');
   const [audioFeedbackEnabled, setAudioFeedbackEnabled] = useState(true);
+
+  // Retrieve rich educational details for active exercise
+  const exerciseMeta = exercise ? EXERCISES.find(e => e.id === exercise.exerciseId || e.name === exercise.name) : null;
 
   // Target reps extraction (e.g. "10-12 reps" -> 10)
   const targetRepsNum = (() => {
@@ -209,9 +219,84 @@ export const WorkoutCamera: React.FC<WorkoutCameraProps> = ({
         </div>
       </div>
 
-      {/* Center Vision Viewport */}
+      {/* Center Viewport: Either Pre-Camera Briefing or Optical Tracking */}
       <div className="flex-1 my-4 relative flex items-center justify-center overflow-hidden rounded-3xl bg-zinc-950 border border-zinc-850 shadow-2xl">
-        {equipmentRestriction ? (
+        {showTutorial ? (
+          <div className="max-w-xl w-full p-6 md:p-8 space-y-6 text-left animate-fade-in">
+            <div className="flex items-center justify-between border-b border-zinc-850 pb-4">
+              <div className="flex items-center gap-2.5">
+                <BookOpen className="w-5 h-5 text-cyan-400" />
+                <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-widest">
+                  Exercise Briefing
+                </span>
+              </div>
+              <span className="text-[10px] font-mono px-2.5 py-1 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 uppercase">
+                Difficulty: {exerciseMeta?.difficulty || 'Standard'}
+              </span>
+            </div>
+
+            <div>
+              <h1 className="text-2xl font-black uppercase text-white tracking-wide">
+                {exercise ? exercise.name : 'Target Exercise'}
+              </h1>
+              <p className="text-xs text-zinc-400 mt-1">
+                Target: <span className="text-zinc-200 font-bold">{exercise?.targetReps || '3 sets of 10 reps'}</span>
+              </p>
+            </div>
+
+            {/* How to do it */}
+            <div className="bg-zinc-900/60 border border-zinc-850 p-4 rounded-xl space-y-2">
+              <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                How to do it
+              </h4>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                {exerciseMeta?.instructions || exercise?.notes || 'Maintain controlled tempo, brace your core, and achieve full range of motion.'}
+              </p>
+            </div>
+
+            {/* Safety notes */}
+            {exerciseMeta?.safetyNotes && (
+              <div className="bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-xl space-y-1">
+                <h5 className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4" /> Safety Cue
+                </h5>
+                <p className="text-xs text-amber-200/90 leading-relaxed">
+                  {exerciseMeta.safetyNotes}
+                </p>
+              </div>
+            )}
+
+            {/* Watch Tutorial Link if available */}
+            {exerciseMeta?.tutorialUrl && (
+              <a
+                href={exerciseMeta.tutorialUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 underline underline-offset-4"
+              >
+                <span>Watch reputable exercise tutorial</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+
+            <div className="pt-2 flex flex-col sm:flex-row gap-3">
+              <Button
+                variant="primary"
+                onClick={() => setShowTutorial(false)}
+                className="w-full py-3 text-xs uppercase font-bold tracking-wider"
+              >
+                <Camera className="w-4 h-4 mr-2" /> Start Camera Tracking
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onClose}
+                className="w-full sm:w-auto text-xs uppercase"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : equipmentRestriction ? (
           <div className="text-center p-8 max-w-md space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
               <ShieldAlert className="w-6 h-6" />

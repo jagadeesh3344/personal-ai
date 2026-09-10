@@ -157,7 +157,9 @@ export async function executeBackendTool(
         setNumber: args.setNumber || 1,
         weightKg,
         reps,
-        completed: args.completed ?? true
+        completed: args.completed ?? true,
+        completionMethod: args.completionMethod || 'VOICE',
+        verification: args.verification || 'SELF_REPORTED'
       });
     }
     case 'completeWorkout': {
