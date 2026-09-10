@@ -667,6 +667,100 @@ describe('FRIDAY Backend Integration & Security Tests', () => {
         executeBackendTool('user-a', 'unauthorizedTool' as any, {})
       ).rejects.toThrow('not a registered FRIDAY tool');
     });
+
+    it('FRIDAY tool getExerciseHistory returns real persisted history and deterministic progression', async () => {
+      const { executeBackendTool } = await import('../src/modules/friday/tools/fridayTools.js');
+
+      // Create a session and add sets for user-a
+      const sessionRes = await app.inject({
+        method: 'POST',
+        url: '/api/workout-sessions',
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: { notes: 'Live Push-up Session' }
+      });
+      const sessionId = JSON.parse(sessionRes.body).session.id;
+
+      await app.inject({
+        method: 'POST',
+        url: `/api/workout-sessions/${sessionId}/sets`,
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: {
+          exerciseId: 'wall-push-up',
+          setNumber: 1,
+          weightKg: 0,
+          reps: 15,
+          completed: true,
+          completionMethod: 'CAMERA'
+        }
+      });
+
+      const historyData = await executeBackendTool('user-a', 'getExerciseHistory', { exerciseId: 'wall-push-up' });
+      expect(historyData.userId).toBe('user-a');
+      expect(historyData.history.length).toBeGreaterThanOrEqual(1);
+      expect(historyData.history[0].exerciseId).toBe('wall-push-up');
+      expect(historyData.progressionRecommendation).toBeDefined();
+      expect(historyData.progressionStates).toBeDefined();
+    });
+  });
+
+  // 10. Adaptive Workout Engine & History API Isolation
+  describe('Adaptive Workout History & Progression API', () => {
+    it('GET /api/workouts/history enforces user isolation (User B cannot see User A sets)', async () => {
+      const resA = await app.inject({
+        method: 'GET',
+        url: '/api/workouts/history',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+      expect(resA.statusCode).toBe(200);
+      const bodyA = JSON.parse(resA.body);
+      expect(bodyA.success).toBe(true);
+      expect(bodyA.history.length).toBeGreaterThanOrEqual(1);
+
+      const resB = await app.inject({
+        method: 'GET',
+        url: '/api/workouts/history',
+        headers: { authorization: `Bearer ${userBToken}` }
+      });
+      expect(resB.statusCode).toBe(200);
+      const bodyB = JSON.parse(resB.body);
+      expect(bodyB.success).toBe(true);
+      // User B has no recorded sets
+      expect(bodyB.history.length).toBe(0);
+    });
+
+    it('GET /api/workouts/progression-state returns deterministic family states', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/workouts/progression-state',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(Array.isArray(body.progressionStates)).toBe(true);
+      const families = body.progressionStates.map((s: any) => s.exerciseFamily);
+      expect(families).toContain('horizontal_push');
+      expect(families).toContain('squat');
+    });
+
+    it('GET /api/workouts/today generates adaptive protocol respecting beginner gating', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/workouts/today',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.workout.exercises.length).toBeGreaterThanOrEqual(1);
+      // Verify every exercise has progression context
+      body.workout.exercises.forEach((ex: any) => {
+        expect(ex.progression).toBeDefined();
+        expect(ex.progression.action).toBeDefined();
+        expect(ex.progression.status).toBeDefined();
+      });
+    });
   });
 });
+
 

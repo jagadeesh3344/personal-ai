@@ -106,6 +106,16 @@ export const FRIDAY_TOOL_DEFINITIONS: ToolDefinition[] = [
     name: 'getProgressSummary',
     description: 'Retrieves bodyweight progression history, body measurements, and monthly checkins.',
     parameters: { type: 'object', properties: {} }
+  },
+  {
+    name: 'getExerciseHistory',
+    description: 'Retrieves actual historical exercise performance sets, performance classification (NO_HISTORY, INCOMPLETE, FAILED, CHALLENGING, GOOD, TOO_EASY), and deterministic progression status (NEW, DEVELOPING, STABLE, READY_TO_PROGRESS, NEEDS_REGRESSION) for the authenticated user.',
+    parameters: {
+      type: 'object',
+      properties: {
+        exerciseId: { type: 'string', description: 'Optional exercise ID (e.g. "knee-push-up", "wall-push-up", "box-squat") to evaluate' }
+      }
+    }
   }
 ];
 
@@ -211,6 +221,9 @@ export async function executeBackendTool(
     }
     case 'getProgressSummary': {
       return ProgressService.getProgress(userId);
+    }
+    case 'getExerciseHistory': {
+      return WorkoutsService.getExerciseHistoryWithProgression(userId, args.exerciseId);
     }
     default:
       throw new Error(`Unhandled tool: ${toolName}`);

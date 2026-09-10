@@ -52,6 +52,14 @@ export interface WorkoutExercise {
   restSeconds: number;
   notes: string;
   trackingType?: TrackingType;
+  progression?: {
+    action: string;
+    status: string;
+    reason: string;
+    currentLevel?: number;
+    consecutiveSuccessfulSessions?: number;
+    consecutiveFailedSessions?: number;
+  };
   sets: WorkoutSet[];
 }
 

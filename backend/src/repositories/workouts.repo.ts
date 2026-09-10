@@ -250,8 +250,71 @@ export class WorkoutsRepository {
         setNumber: set.set_number,
         weightKg: Number(set.weight_kg),
         reps: set.reps,
-        completed: set.completed
+        durationSeconds: set.duration_seconds ? Number(set.duration_seconds) : undefined,
+        resistanceLevel: set.resistance_level || undefined,
+        completed: set.completed,
+        rpe: set.rpe ? Number(set.rpe) : undefined,
+        completionMethod: set.completion_method || 'MANUAL',
+        verification: set.verification || 'SELF_REPORTED'
       }))
     };
+  }
+
+  static async getExerciseHistory(
+    userId: string,
+    exerciseId?: string,
+    client?: SupabaseClient
+  ): Promise<Array<{
+    sessionId: string;
+    date: string;
+    exerciseId: string;
+    setNumber: number;
+    actualReps: number;
+    weightKg: number;
+    durationSeconds?: number;
+    resistanceLevel?: string;
+    completed: boolean;
+    completionMethod: 'CAMERA' | 'VOICE' | 'MANUAL';
+    verification: 'VERIFIED' | 'SELF_REPORTED';
+    rpe?: number;
+  }>> {
+    const sessions = await this.getSessions(userId, client);
+    const history: Array<{
+      sessionId: string;
+      date: string;
+      exerciseId: string;
+      setNumber: number;
+      actualReps: number;
+      weightKg: number;
+      durationSeconds?: number;
+      resistanceLevel?: string;
+      completed: boolean;
+      completionMethod: 'CAMERA' | 'VOICE' | 'MANUAL';
+      verification: 'VERIFIED' | 'SELF_REPORTED';
+      rpe?: number;
+    }> = [];
+
+    for (const session of sessions) {
+      for (const set of session.sets) {
+        if (!exerciseId || set.exerciseId === exerciseId) {
+          history.push({
+            sessionId: session.id,
+            date: session.date,
+            exerciseId: set.exerciseId,
+            setNumber: set.setNumber,
+            actualReps: set.reps,
+            weightKg: set.weightKg,
+            durationSeconds: set.durationSeconds,
+            resistanceLevel: set.resistanceLevel,
+            completed: set.completed,
+            completionMethod: set.completionMethod || 'MANUAL',
+            verification: set.verification || 'SELF_REPORTED',
+            rpe: set.rpe
+          });
+        }
+      }
+    }
+
+    return history.sort((a, b) => a.date.localeCompare(b.date) || a.setNumber - b.setNumber);
   }
 }

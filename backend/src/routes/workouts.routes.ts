@@ -21,6 +21,29 @@ export async function workoutRoutes(fastify: FastifyInstance) {
     return reply.send({ success: true, sessions });
   });
 
+  // GET /api/workouts/history
+  fastify.get('/workouts/history', async (request, reply) => {
+    const userId = request.user!.id;
+    const { exerciseId } = request.query as { exerciseId?: string };
+    const history = await WorkoutsService.getExerciseHistory(userId, exerciseId);
+    return reply.send({ success: true, history });
+  });
+
+  // GET /api/workouts/history/:exerciseId
+  fastify.get('/workouts/history/:exerciseId', async (request, reply) => {
+    const userId = request.user!.id;
+    const { exerciseId } = request.params as { exerciseId: string };
+    const historyData = await WorkoutsService.getExerciseHistoryWithProgression(userId, exerciseId);
+    return reply.send({ success: true, ...historyData });
+  });
+
+  // GET /api/workouts/progression-state
+  fastify.get('/workouts/progression-state', async (request, reply) => {
+    const userId = request.user!.id;
+    const progressionStates = await WorkoutsService.getProgressionStates(userId);
+    return reply.send({ success: true, progressionStates });
+  });
+
   // POST /api/workout-sessions
   fastify.post('/workout-sessions', async (request, reply) => {
     const userId = request.user!.id;

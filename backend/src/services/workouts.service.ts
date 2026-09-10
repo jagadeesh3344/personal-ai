@@ -1,5 +1,8 @@
 import { WorkoutsRepository, WorkoutSessionEntity, WorkoutSetEntity } from '../repositories/workouts.repo.js';
 import { ProfileRepository } from '../repositories/profile.repo.js';
+import { evaluateExerciseProgression, deriveProgressionState, ADAPTIVE_PROGRESSION_LADDERS } from '../modules/workouts/adaptive/progressionEngine.js';
+import { aggregateExerciseSessions } from '../modules/workouts/adaptive/performanceAnalyzer.js';
+import { ExerciseHistoryItem, ExerciseProgressionState } from '../modules/workouts/adaptive/types.js';
 
 export interface ExerciseDef {
   id: string;
@@ -31,6 +34,7 @@ export const BACKEND_EXERCISES: ExerciseDef[] = [
   { id: 'diamond-push-up', name: 'Diamond Push-up', equipmentRequired: ['NONE'], environment: ['HOME', 'GYM', 'OUTDOOR'], muscleGroups: ['TRICEPS', 'CHEST'], difficulty: 'ADVANCED', instructions: 'Hands together forming a diamond under chest. Lower chest and press.' },
   
   // Dumbbell
+  { id: 'dumbbell-goblet-squat', name: 'Dumbbell Goblet Squat', equipmentRequired: ['DUMBBELLS'], environment: ['HOME', 'GYM'], muscleGroups: ['LEGS'], difficulty: 'INTERMEDIATE', instructions: 'Hold dumbbell vertically against chest. Squat deeply keeping elbows inside knees.' },
   { id: 'dumbbell-row', name: 'Dumbbell Row', equipmentRequired: ['DUMBBELLS'], environment: ['HOME', 'GYM'], muscleGroups: ['BACK', 'BICEPS'], difficulty: 'BEGINNER', instructions: 'Hinge forward. Pull dumbbell back toward hip.' },
   { id: 'dumbbell-curl', name: 'Dumbbell Curl', equipmentRequired: ['DUMBBELLS'], environment: ['HOME', 'GYM'], muscleGroups: ['BICEPS'], difficulty: 'BEGINNER', instructions: 'Curl dumbbells up, squeezing biceps at top.' },
   { id: 'dumbbell-shoulder-press', name: 'Dumbbell Shoulder Press', equipmentRequired: ['DUMBBELLS'], environment: ['HOME', 'GYM'], muscleGroups: ['SHOULDERS', 'TRICEPS'], difficulty: 'BEGINNER', instructions: 'Press dumbbells overhead without arching lower back.' },
@@ -85,12 +89,111 @@ export class WorkoutsService {
     });
   }
 
+  static async getExerciseHistory(userId: string, exerciseId?: string): Promise<ExerciseHistoryItem[]> {
+    return WorkoutsRepository.getExerciseHistory(userId, exerciseId);
+  }
+
+  static async getProgressionStates(userId: string): Promise<ExerciseProgressionState[]> {
+    const profile = await ProfileRepository.getProfile(userId);
+    const context = {
+      trainingExperience: (profile?.trainingExperience as any) || 'BEGINNER',
+      equipment: profile?.equipment || ['NONE'],
+      trainingEnvironment: profile?.trainingEnvironment || 'HOME'
+    };
+
+    const history = await WorkoutsRepository.getExerciseHistory(userId);
+    const sessions = aggregateExerciseSessions(history);
+
+    const families = Object.keys(ADAPTIVE_PROGRESSION_LADDERS);
+    return families.map(familyId => deriveProgressionState(familyId, context, sessions));
+  }
+
+  static async getExerciseHistoryWithProgression(userId: string, exerciseId?: string) {
+    const history = await WorkoutsRepository.getExerciseHistory(userId, exerciseId);
+    const sessions = aggregateExerciseSessions(history);
+    const profile = await ProfileRepository.getProfile(userId);
+    const context = {
+      trainingExperience: (profile?.trainingExperience as any) || 'BEGINNER',
+      equipment: profile?.equipment || ['NONE'],
+      trainingEnvironment: profile?.trainingEnvironment || 'HOME'
+    };
+
+    let progressionRecommendation = null;
+    if (exerciseId) {
+      const exerciseSessions = sessions.filter(s => s.exerciseId === exerciseId);
+      const exDef = BACKEND_EXERCISES.find(e => e.id === exerciseId);
+      const exName = exDef?.name || exerciseId;
+      progressionRecommendation = evaluateExerciseProgression(
+        exerciseId,
+        exName,
+        context,
+        exerciseSessions
+      );
+    }
+
+    const progressionStates = await this.getProgressionStates(userId);
+
+    return {
+      userId,
+      exerciseId: exerciseId || null,
+      historyCount: history.length,
+      recentSessions: sessions.slice(-5),
+      history,
+      progressionRecommendation,
+      progressionStates
+    };
+  }
+
   static async getTodayWorkout(userId: string) {
     const profile = await ProfileRepository.getProfile(userId);
     const env = profile?.trainingEnvironment || 'HOME';
     const equip = profile?.equipment || ['NONE'];
-    const exp = profile?.trainingExperience || 'BEGINNER';
+    const exp = (profile?.trainingExperience as any) || 'BEGINNER';
     const compatible = this.getCompatibleExercises(env, equip, exp);
+
+    const historyItems = await WorkoutsRepository.getExerciseHistory(userId);
+    const sessionPerformances = aggregateExerciseSessions(historyItems);
+
+    const userContext = {
+      trainingExperience: exp,
+      equipment: equip,
+      trainingEnvironment: env
+    };
+
+    const baseExercises = compatible.slice(0, 5);
+    const adaptedExercises = baseExercises.map((ex, idx) => {
+      const exHistory = sessionPerformances.filter(sp => sp.exerciseId === ex.id);
+      const recommendation = evaluateExerciseProgression(
+        ex.id,
+        ex.name,
+        userContext,
+        exHistory,
+        { targetSets: 3, targetReps: '10-12 reps' }
+      );
+
+      // Find full definition if exercise was progressed or regressed to a different exercise
+      const finalEx = BACKEND_EXERCISES.find(e => e.id === recommendation.recommendedExerciseId) || ex;
+
+      return {
+        order: idx + 1,
+        exerciseId: finalEx.id,
+        name: finalEx.name,
+        targetSets: recommendation.targetSets,
+        targetReps: recommendation.targetReps,
+        restSeconds: 60,
+        equipmentRequired: finalEx.equipmentRequired,
+        muscleGroups: finalEx.muscleGroups,
+        instructions: finalEx.instructions,
+        progression: {
+          action: recommendation.action,
+          status: recommendation.status,
+          currentLevel: recommendation.currentLevel,
+          consecutiveSuccessfulSessions: recommendation.consecutiveSuccessfulSessions,
+          consecutiveFailedSessions: recommendation.consecutiveFailedSessions,
+          reason: recommendation.reason
+        }
+      };
+    });
 
     return {
       userId,
@@ -98,18 +201,8 @@ export class WorkoutsService {
       equipment: equip,
       experience: exp,
       date: new Date().toISOString().split('T')[0],
-      dayName: 'Today Workout Protocol',
-      exercises: compatible.slice(0, 5).map((ex, idx) => ({
-        order: idx + 1,
-        exerciseId: ex.id,
-        name: ex.name,
-        targetSets: 3,
-        targetReps: '10-12 reps',
-        restSeconds: 60,
-        equipmentRequired: ex.equipmentRequired,
-        muscleGroups: ex.muscleGroups,
-        instructions: ex.instructions
-      }))
+      dayName: 'Today Adaptive Workout Protocol',
+      exercises: adaptedExercises
     };
   }
 

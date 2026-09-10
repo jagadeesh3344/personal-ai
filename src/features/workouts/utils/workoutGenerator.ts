@@ -2,6 +2,9 @@ import { UserProfile } from '../../../types/profile';
 import { EXERCISES, Exercise } from '../data/exercises';
 import { getAvailableExercises } from './equipmentFilter';
 import { WorkoutPlan, WorkoutDay, WorkoutExercise, WorkoutSet } from '../../../types';
+import { evaluateExerciseProgression } from '../adaptive/progressionEngine';
+import { aggregateExerciseSessions } from '../adaptive/performanceAnalyzer';
+import { ExerciseHistoryItem } from '../adaptive/types';
 
 export function generateWorkout(profile: UserProfile): WorkoutPlan {
   const rawPool = getAvailableExercises(profile, EXERCISES);
@@ -194,3 +197,84 @@ export function generateWorkout(profile: UserProfile): WorkoutPlan {
     days
   };
 }
+
+/**
+ * Deterministically generates an adaptive workout plan considering user profile + historical performance.
+ */
+export function generateAdaptiveWorkout(
+  profile: UserProfile,
+  historyItems: ExerciseHistoryItem[] = []
+): WorkoutPlan {
+  const basePlan = generateWorkout(profile);
+  if (!historyItems || historyItems.length === 0) {
+    return basePlan;
+  }
+
+  const sessionPerformances = aggregateExerciseSessions(historyItems);
+  const userContext = {
+    trainingExperience: profile.trainingExperience || 'BEGINNER',
+    equipment: profile.equipment || ['NONE'],
+    trainingEnvironment: profile.trainingEnvironment || 'HOME'
+  };
+
+  const adaptedDays: WorkoutDay[] = basePlan.days.map((day, dayIdx) => {
+    const adaptedExercises: WorkoutExercise[] = day.exercises.map((ex, exIdx) => {
+      const exHistory = sessionPerformances.filter(sp => sp.exerciseId === ex.exerciseId);
+      const recommendation = evaluateExerciseProgression(
+        ex.exerciseId,
+        ex.name,
+        userContext,
+        exHistory,
+        { targetSets: ex.targetSets, targetReps: ex.targetReps }
+      );
+
+      let chosenDef = EXERCISES.find(e => e.id === recommendation.recommendedExerciseId);
+      if (!chosenDef) {
+        chosenDef = EXERCISES.find(e => e.id === ex.exerciseId);
+      }
+
+      const targetSets = recommendation.targetSets;
+      const targetReps = recommendation.targetReps;
+      const isBodyweight = chosenDef ? (chosenDef.equipmentRequired.length === 0 || 
+        (chosenDef.equipmentRequired.length === 1 && chosenDef.equipmentRequired[0] === 'NONE')) : true;
+
+      const updatedSets: WorkoutSet[] = Array.from({ length: targetSets }).map((_, setIdx) => ({
+        id: `set-${chosenDef?.id || ex.exerciseId}-d${dayIdx + 1}-s${setIdx + 1}`,
+        setNumber: setIdx + 1,
+        weightKg: isBodyweight ? 0 : 12,
+        reps: parseInt(targetReps, 10) || 10,
+        completed: false
+      }));
+
+      return {
+        ...ex,
+        exerciseId: chosenDef ? chosenDef.id : ex.exerciseId,
+        name: chosenDef ? chosenDef.name : ex.name,
+        targetSets,
+        targetReps,
+        notes: recommendation.reason,
+        progression: {
+          action: recommendation.action,
+          status: recommendation.status,
+          reason: recommendation.reason,
+          currentLevel: recommendation.currentLevel,
+          consecutiveSuccessfulSessions: recommendation.consecutiveSuccessfulSessions,
+          consecutiveFailedSessions: recommendation.consecutiveFailedSessions
+        },
+        sets: updatedSets
+      };
+    });
+
+    return {
+      ...day,
+      exercises: adaptedExercises
+    };
+  });
+
+  return {
+    ...basePlan,
+    name: `Adaptive ${basePlan.name}`,
+    days: adaptedDays
+  };
+}
+

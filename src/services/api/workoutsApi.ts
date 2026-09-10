@@ -11,6 +11,21 @@ export const workoutsApi = {
     return res.sessions;
   },
 
+  async getHistory(exerciseId?: string) {
+    const url = exerciseId ? `/workouts/history?exerciseId=${encodeURIComponent(exerciseId)}` : '/workouts/history';
+    const res = await apiClient.get<{ success: boolean; history: any[] }>(url);
+    return res.history;
+  },
+
+  async getExerciseHistoryWithProgression(exerciseId: string) {
+    return apiClient.get<{ success: boolean; history: any[]; progressionRecommendation: any; progressionStates: any[] }>(`/workouts/history/${encodeURIComponent(exerciseId)}`);
+  },
+
+  async getProgressionStates() {
+    const res = await apiClient.get<{ success: boolean; progressionStates: any[] }>('/workouts/progression-state');
+    return res.progressionStates;
+  },
+
   async createSession(data: { dayId?: string | null; date?: string; notes?: string }): Promise<WorkoutSession> {
     const res = await apiClient.post<{ success: boolean; session: WorkoutSession }>('/workout-sessions', data);
     return res.session;
