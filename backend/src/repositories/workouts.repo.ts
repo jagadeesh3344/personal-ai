@@ -21,6 +21,8 @@ export interface WorkoutSetEntity {
   setNumber: number;
   weightKg: number;
   reps: number;
+  durationSeconds?: number;
+  resistanceLevel?: string;
   completed: boolean;
   rpe?: number;
   completionMethod?: 'CAMERA' | 'VOICE' | 'MANUAL';
@@ -61,8 +63,12 @@ export class WorkoutsRepository {
         setNumber: set.set_number,
         weightKg: Number(set.weight_kg),
         reps: set.reps,
+        durationSeconds: set.duration_seconds ? Number(set.duration_seconds) : undefined,
+        resistanceLevel: set.resistance_level || undefined,
         completed: set.completed,
-        rpe: set.rpe ? Number(set.rpe) : undefined
+        rpe: set.rpe ? Number(set.rpe) : undefined,
+        completionMethod: set.completion_method || 'MANUAL',
+        verification: set.verification || 'SELF_REPORTED'
       }))
     }));
   }
@@ -118,6 +124,8 @@ export class WorkoutsRepository {
       setNumber: number; 
       weightKg: number; 
       reps: number; 
+      durationSeconds?: number;
+      resistanceLevel?: string;
       completed?: boolean; 
       rpe?: number;
       completionMethod?: 'CAMERA' | 'VOICE' | 'MANUAL';
@@ -132,6 +140,8 @@ export class WorkoutsRepository {
       setNumber: setData.setNumber,
       weightKg: setData.weightKg,
       reps: setData.reps,
+      durationSeconds: setData.durationSeconds,
+      resistanceLevel: setData.resistanceLevel,
       completed: setData.completed ?? false,
       rpe: setData.rpe,
       completionMethod: setData.completionMethod || 'MANUAL',
@@ -170,14 +180,20 @@ export class WorkoutsRepository {
         set_number: setData.setNumber,
         weight_kg: setData.weightKg,
         reps: setData.reps,
+        duration_seconds: setData.durationSeconds || null,
+        resistance_level: setData.resistanceLevel || null,
         completed: setData.completed ?? false,
-        rpe: setData.rpe
+        rpe: setData.rpe || null,
+        completion_method: newSet.completionMethod,
+        verification: newSet.verification
       })
       .select()
       .single();
 
     if (error) throw error;
     newSet.id = created.id;
+    newSet.completionMethod = created.completion_method || newSet.completionMethod;
+    newSet.verification = created.verification || newSet.verification;
     return newSet;
   }
 

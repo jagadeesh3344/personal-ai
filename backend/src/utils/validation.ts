@@ -72,13 +72,25 @@ export const WorkoutSetCreateSchema = z.object({
   exerciseId: z.string().min(1),
   setNumber: z.number().int().min(1),
   weightKg: z.number().min(0),
-  reps: z.number().int().min(0),
+  reps: z.number().int().min(0, { message: 'Reps cannot be negative' }),
   durationSeconds: z.number().int().min(0).optional(),
   resistanceLevel: z.string().optional(),
   completed: z.boolean().default(false),
   rpe: z.number().min(1).max(10).optional(),
   completionMethod: z.enum(['CAMERA', 'VOICE', 'MANUAL']).default('MANUAL').optional(),
   verification: z.enum(['VERIFIED', 'SELF_REPORTED']).default('SELF_REPORTED').optional()
+}).superRefine((data, ctx) => {
+  if (data.completed) {
+    const hasReps = data.reps > 0;
+    const hasDuration = typeof data.durationSeconds === 'number' && data.durationSeconds > 0;
+    if (!hasReps && !hasDuration) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['reps'],
+        message: 'Completed sets must have reps > 0 or durationSeconds > 0'
+      });
+    }
+  }
 });
 
 export const MealItemSchema = z.object({

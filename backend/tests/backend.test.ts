@@ -181,6 +181,195 @@ describe('FRIDAY Backend Integration & Security Tests', () => {
       const body = JSON.parse(res.body);
       expect(body.error).toContain('does not belong to user');
     });
+
+    // =========================================================================
+    // Workout Verification, Beginner Gating & Anti-Tampering Integrity Tests
+    // =========================================================================
+    it('Backend beginner gating: BEGINNER user receives only BEGINNER exercises from getTodayWorkout', async () => {
+      // Set User A to BEGINNER
+      await app.inject({
+        method: 'PATCH',
+        url: '/api/profile',
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: { trainingExperience: 'BEGINNER', equipment: ['NONE'] }
+      });
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/workouts/today',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.workout.exercises.length).toBeGreaterThan(0);
+
+      const { BACKEND_EXERCISES } = await import('../src/services/workouts.service.js');
+      body.workout.exercises.forEach((ex: any) => {
+        const def = BACKEND_EXERCISES.find(e => e.id === ex.exerciseId);
+        expect(def).toBeDefined();
+        expect(def?.difficulty).toBe('BEGINNER');
+      });
+    });
+
+    it('Beginner cannot receive Diamond Push-up (reclassified as ADVANCED)', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/workouts/today',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+
+      const body = JSON.parse(res.body);
+      const exIds = body.workout.exercises.map((e: any) => e.exerciseId);
+      expect(exIds).not.toContain('diamond-push-up');
+    });
+
+    it('Backend API tampering: MANUAL completion claiming VERIFIED is sanitized to SELF_REPORTED', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/workout-sessions/${sessionAId}/sets`,
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: {
+          exerciseId: 'push-up',
+          setNumber: 3,
+          weightKg: 0,
+          reps: 10,
+          completed: true,
+          completionMethod: 'MANUAL',
+          verification: 'VERIFIED' // Attempted tampering
+        }
+      });
+
+      expect(res.statusCode).toBe(201);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.set.completionMethod).toBe('MANUAL');
+      expect(body.set.verification).toBe('SELF_REPORTED'); // Sanitized
+    });
+
+    it('Voice tampering: VOICE completion claiming VERIFIED is sanitized to SELF_REPORTED', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/workout-sessions/${sessionAId}/sets`,
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: {
+          exerciseId: 'push-up',
+          setNumber: 4,
+          weightKg: 0,
+          reps: 10,
+          completed: true,
+          completionMethod: 'VOICE',
+          verification: 'VERIFIED' // Attempted tampering
+        }
+      });
+
+      expect(res.statusCode).toBe(201);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.set.completionMethod).toBe('VOICE');
+      expect(body.set.verification).toBe('SELF_REPORTED'); // Sanitized
+    });
+
+    it('Camera verification: CAMERA completion produces VERIFIED', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/workout-sessions/${sessionAId}/sets`,
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: {
+          exerciseId: 'push-up',
+          setNumber: 5,
+          weightKg: 0,
+          reps: 12,
+          completed: true,
+          completionMethod: 'CAMERA'
+        }
+      });
+
+      expect(res.statusCode).toBe(201);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.set.completionMethod).toBe('CAMERA');
+      expect(body.set.verification).toBe('VERIFIED');
+    });
+
+    it('Completed zero-rep set: rejects with 400 validation error', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/workout-sessions/${sessionAId}/sets`,
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: {
+          exerciseId: 'push-up',
+          setNumber: 6,
+          weightKg: 0,
+          reps: 0,
+          completed: true
+        }
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('Negative reps: rejects with 400 validation error', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/workout-sessions/${sessionAId}/sets`,
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: {
+          exerciseId: 'push-up',
+          setNumber: 7,
+          weightKg: 0,
+          reps: -5,
+          completed: false
+        }
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('Repository persistence: CAMERA + VERIFIED is stored and retrievable', async () => {
+      const { WorkoutsRepository } = await import('../src/repositories/workouts.repo.js');
+      const set = await WorkoutsRepository.addSet('user-a', sessionAId, {
+        exerciseId: 'push-up',
+        setNumber: 8,
+        weightKg: 0,
+        reps: 15,
+        completed: true,
+        completionMethod: 'CAMERA',
+        verification: 'VERIFIED'
+      });
+
+      expect(set.completionMethod).toBe('CAMERA');
+      expect(set.verification).toBe('VERIFIED');
+
+      const sessions = await WorkoutsRepository.getSessions('user-a');
+      const active = sessions.find(s => s.id === sessionAId);
+      const storedSet = active?.sets.find(s => s.id === set.id);
+      expect(storedSet?.completionMethod).toBe('CAMERA');
+      expect(storedSet?.verification).toBe('VERIFIED');
+    });
+
+    it('Existing manual set persistence: MANUAL + SELF_REPORTED is stored and retrievable', async () => {
+      const { WorkoutsRepository } = await import('../src/repositories/workouts.repo.js');
+      const set = await WorkoutsRepository.addSet('user-a', sessionAId, {
+        exerciseId: 'push-up',
+        setNumber: 9,
+        weightKg: 0,
+        reps: 10,
+        completed: true,
+        completionMethod: 'MANUAL',
+        verification: 'SELF_REPORTED'
+      });
+
+      expect(set.completionMethod).toBe('MANUAL');
+      expect(set.verification).toBe('SELF_REPORTED');
+
+      const sessions = await WorkoutsRepository.getSessions('user-a');
+      const active = sessions.find(s => s.id === sessionAId);
+      const storedSet = active?.sets.find(s => s.id === set.id);
+      expect(storedSet?.completionMethod).toBe('MANUAL');
+      expect(storedSet?.verification).toBe('SELF_REPORTED');
+    });
   });
 
   // 5. Nutrition Isolation
