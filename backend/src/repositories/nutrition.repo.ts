@@ -253,4 +253,42 @@ export class NutritionRepository {
     if (error) throw error;
     return targets;
   }
+
+  static async getAllMeals(userId: string, client?: SupabaseClient): Promise<MealEntity[]> {
+    if (process.env.NODE_ENV === 'test' || !process.env.SUPABASE_URL || process.env.SUPABASE_URL.includes('placeholder')) {
+      return memoryMeals.get(userId) || [];
+    }
+
+    const sb = client || getSupabaseAdmin();
+    const { data: meals, error } = await sb
+      .from('meals')
+      .select('*, meal_items(*)')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
+
+    if (error || !meals) return [];
+
+    return meals.map((m: any) => ({
+      id: m.id,
+      userId: m.user_id,
+      date: m.date,
+      type: m.type,
+      name: m.name,
+      time: m.time,
+      totalCalories: m.total_calories,
+      totalProtein: m.total_protein,
+      totalCarbs: m.total_carbs,
+      totalFat: m.total_fat,
+      items: (m.meal_items || []).map((i: any) => ({
+        id: i.id,
+        name: i.name,
+        quantity: i.quantity,
+        calories: i.calories,
+        protein: i.protein,
+        carbs: i.carbs,
+        fat: i.fat
+      }))
+    }));
+  }
 }
+

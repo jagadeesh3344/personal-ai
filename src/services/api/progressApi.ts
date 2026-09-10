@@ -33,5 +33,15 @@ export const progressApi = {
   async getSignedPhotoUrl(storagePath: string): Promise<string> {
     const res = await apiClient.get<{ success: boolean; signedUrl: string }>(`/progress/photos/signed-url?storagePath=${encodeURIComponent(storagePath)}`);
     return res.signedUrl;
+  },
+
+  async getIntelligence(periodDays: number = 30) {
+    const res = await apiClient.get<{ success: boolean; intelligence: any }>(`/progress/intelligence?periodDays=${periodDays}`);
+    return res.intelligence;
+  },
+
+  async getTimeline(periodDays: number = 30) {
+    const res = await apiClient.get<{ success: boolean; timeline: any[] }>(`/progress/timeline?periodDays=${periodDays}`);
+    return res.timeline;
   }
 };

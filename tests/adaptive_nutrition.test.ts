@@ -18,7 +18,7 @@ describe('Phase 7: Deterministic Adaptive Nutrition Intelligence Engine', () => 
     sex: 'MALE',
     currentWeightKg: 75,
     heightCm: 180,
-    goal: 'MAINTAIN',
+    goal: 'GENERAL_FITNESS',
     activityLevel: 'MODERATELY_ACTIVE',
     trainingExperience: 'INTERMEDIATE',
     equipment: ['DUMBBELLS'],
@@ -33,6 +33,8 @@ describe('Phase 7: Deterministic Adaptive Nutrition Intelligence Engine', () => 
   };
 
   const defaultTargets: NutritionTargets = {
+    bmr: 1750,
+    maintenanceCalories: 2400,
     targetCalories: 2400,
     proteinGrams: 150,
     carbsGrams: 250,

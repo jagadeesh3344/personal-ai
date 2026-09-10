@@ -212,4 +212,70 @@ export class ProgressRepository {
     if (error || !data?.signedUrl) throw error || new Error('Failed to generate signed download URL');
     return data.signedUrl;
   }
+
+  static async getPhotos(userId: string, client?: SupabaseClient): Promise<ProgressPhotoEntity[]> {
+    if (process.env.NODE_ENV === 'test' || !process.env.SUPABASE_URL || process.env.SUPABASE_URL.includes('placeholder')) {
+      return memoryPhotos.get(userId) || [];
+    }
+
+    const sb = client || getSupabaseAdmin();
+    const { data, error } = await sb
+      .from('progress_photos')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
+
+    if (error || !data) return [];
+
+    return data.map((p: any) => ({
+      id: p.id,
+      userId: p.user_id,
+      checkinId: p.checkin_id,
+      date: p.date,
+      pose: p.pose,
+      storagePath: p.storage_path,
+      createdAt: p.created_at
+    }));
+  }
+
+  static async addPhotoRecord(
+    userId: string, 
+    data: { pose: 'FRONT' | 'SIDE' | 'BACK'; storagePath: string; date?: string; checkinId?: string },
+    client?: SupabaseClient
+  ): Promise<ProgressPhotoEntity> {
+    const photo: ProgressPhotoEntity = {
+      id: `pho-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      userId,
+      pose: data.pose,
+      storagePath: data.storagePath,
+      date: data.date || new Date().toISOString().split('T')[0],
+      checkinId: data.checkinId,
+      createdAt: new Date().toISOString()
+    };
+
+    if (process.env.NODE_ENV === 'test' || !process.env.SUPABASE_URL || process.env.SUPABASE_URL.includes('placeholder')) {
+      const list = memoryPhotos.get(userId) || [];
+      list.unshift(photo);
+      memoryPhotos.set(userId, list);
+      return photo;
+    }
+
+    const sb = client || getSupabaseAdmin();
+    const { data: created, error } = await sb
+      .from('progress_photos')
+      .insert({
+        user_id: userId,
+        pose: photo.pose,
+        storage_path: photo.storagePath,
+        date: photo.date,
+        checkin_id: photo.checkinId
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    photo.id = created.id;
+    return photo;
+  }
 }
+

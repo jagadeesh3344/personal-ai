@@ -88,4 +88,28 @@ export class HydrationRepository {
 
     return !error;
   }
+
+  static async getAllEntries(userId: string, client?: SupabaseClient): Promise<HydrationEntryEntity[]> {
+    if (process.env.NODE_ENV === 'test' || !process.env.SUPABASE_URL || process.env.SUPABASE_URL.includes('placeholder')) {
+      return memoryHydration.get(userId) || [];
+    }
+
+    const sb = client || getSupabaseAdmin();
+    const { data, error } = await sb
+      .from('hydration_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
+
+    if (error || !data) return [];
+
+    return data.map((d: any) => ({
+      id: d.id,
+      userId: d.user_id,
+      date: d.date,
+      amountMl: d.amount_ml,
+      loggedAt: d.logged_at
+    }));
+  }
 }
+

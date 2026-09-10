@@ -1,23 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
-import { Scale, ArrowLeft, Plus } from 'lucide-react';
+import {
+  Scale,
+  ArrowLeft,
+  Plus,
+  Activity,
+  Flame,
+  Droplets,
+  Dumbbell,
+  Calendar,
+  Camera,
+  CheckCircle2,
+  AlertCircle,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  ShieldCheck,
+  Sparkles
+} from 'lucide-react';
 import { ProgressState } from '../types';
+import { UserProfile } from '../types/profile';
+import { progressApi } from '../services/api/progressApi';
+import { ProgressSnapshot } from '../features/progress/intelligence/types';
+import { buildProgressSnapshot } from '../features/progress/intelligence/progressAnalyzer';
+import { analyzeWeightTrend } from '../features/progress/intelligence/weightTrendAnalyzer';
+import { analyzeWorkoutProgress } from '../features/progress/intelligence/workoutProgressAnalyzer';
+import { analyzeNutritionAdherence } from '../features/progress/intelligence/nutritionAdherenceAnalyzer';
+import { analyzeHydration } from '../features/progress/intelligence/hydrationAnalyzer';
+import { analyzeBodyMeasurements } from '../features/progress/intelligence/measurementAnalyzer';
+import { analyzeCheckins, analyzePhotos } from '../features/progress/intelligence/checkinAnalyzer';
 
 interface ProgressProps {
   progressData: ProgressState;
   onAddWeight: (weightKg: number) => void;
   onAddMeasurement: (record: { date: string; chestCm?: number; waistCm?: number; armsCm?: number; thighsCm?: number }) => void;
   setTab: (tab: string) => void;
+  userProfile?: UserProfile | null;
 }
 
 export const Progress: React.FC<ProgressProps> = ({
   progressData,
   onAddWeight,
   onAddMeasurement,
-  setTab
+  setTab,
+  userProfile
 }) => {
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [newWeight, setNewWeight] = useState('');
@@ -25,6 +54,68 @@ export const Progress: React.FC<ProgressProps> = ({
   const [newWaist, setNewWaist] = useState('');
   const [newArms, setNewArms] = useState('');
   const [newThighs, setNewThighs] = useState('');
+
+  const [backendSnapshot, setBackendSnapshot] = useState<ProgressSnapshot | null>(null);
+  const [loadingIntelligence, setLoadingIntelligence] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoadingIntelligence(true);
+    progressApi.getIntelligence(30)
+      .then(data => {
+        if (isMounted && data) {
+          setBackendSnapshot(data);
+        }
+      })
+      .catch(() => {
+        // Fallback to local deterministic derivation if offline or dev mode
+      })
+      .finally(() => {
+        if (isMounted) setLoadingIntelligence(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [progressData.weights.length, progressData.measurements.length]);
+
+  // Compute fallback snapshot deterministically from available props if backend fetch is pending or fails
+  const localSnapshot: ProgressSnapshot = React.useMemo(() => {
+    if (backendSnapshot) return backendSnapshot;
+
+    const weightRecords = progressData.weights.map(w => ({ date: w.date, weightKg: w.weightKg }));
+    const weightAnalysis = analyzeWeightTrend(weightRecords, userProfile?.targetWeightKg);
+    const measurementAnalysis = analyzeBodyMeasurements(
+      progressData.measurements.map(m => ({
+        date: m.date,
+        chestCm: m.chestCm,
+        waistCm: m.waistCm,
+        armsCm: m.armsCm,
+        thighsCm: m.thighsCm
+      }))
+    );
+
+    const workoutAnalysis = analyzeWorkoutProgress([], [], 3);
+    const nutritionAnalysis = analyzeNutritionAdherence([], 2000, 140, 30);
+    const hydrationAnalysis = analyzeHydration([], 2500, 30);
+    const checkinAnalysis = analyzeCheckins([]);
+    const photoAnalysis = analyzePhotos([]);
+
+    return buildProgressSnapshot({
+      userId: 'local-user',
+      goal: userProfile?.goal || 'GENERAL_FITNESS',
+      periodDays: 30,
+      weight: weightAnalysis,
+      workouts: workoutAnalysis,
+      nutrition: nutritionAnalysis,
+      hydration: hydrationAnalysis,
+      measurements: measurementAnalysis,
+      checkins: checkinAnalysis,
+      photos: photoAnalysis
+    });
+  }, [backendSnapshot, progressData, userProfile]);
+
+  const snapshot = backendSnapshot || localSnapshot;
 
   const handleCheckInSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +147,7 @@ export const Progress: React.FC<ProgressProps> = ({
     setShowCheckInModal(false);
   };
 
-  const weights = progressData.weights;
+  const weights = snapshot.weight.history;
   const values = weights.map(w => w.weightKg);
   const maxWeight = values.length > 0 ? Math.max(...values) + 1 : 100;
   const minWeight = values.length > 0 ? Math.min(...values) - 1 : 50;
@@ -73,69 +164,144 @@ export const Progress: React.FC<ProgressProps> = ({
     return { x, y, item };
   });
 
-  const pathD = points.length > 1 
+  const pathD = points.length > 1
     ? `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ')
     : (points.length === 1 ? `M ${points[0].x} ${points[0].y} L ${points[0].x + 10} ${points[0].y}` : '');
 
-  const latestWeight = weights.length > 0 ? weights[weights.length - 1].weightKg : null;
-  const latestMeas = progressData.measurements.length > 0 ? progressData.measurements[progressData.measurements.length - 1] : null;
+  // Helper badge renderers
+  const getOverallStatusBadge = (status: string) => {
+    switch (status) {
+      case 'ON_TRACK':
+      case 'IMPROVING':
+        return <span className="px-2.5 py-1 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> {status}</span>;
+      case 'MIXED_PROGRESS':
+        return <span className="px-2.5 py-1 rounded bg-amber-950/60 text-amber-400 border border-amber-500/30 text-xs font-mono font-bold flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> {status}</span>;
+      case 'NEEDS_ATTENTION':
+      case 'STALLED':
+        return <span className="px-2.5 py-1 rounded bg-red-950/60 text-red-400 border border-red-500/30 text-xs font-mono font-bold flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5" /> {status}</span>;
+      default:
+        return <span className="px-2.5 py-1 rounded bg-zinc-900 text-zinc-400 border border-zinc-800 text-xs font-mono font-bold flex items-center gap-1.5"><Minus className="w-3.5 h-3.5" /> INSUFFICIENT DATA</span>;
+    }
+  };
+
+  const getTrendIcon = (trend: string) => {
+    if (trend === 'INCREASING') return <TrendingUp className="w-4 h-4 text-emerald-400" />;
+    if (trend === 'DECREASING') return <TrendingDown className="w-4 h-4 text-cyan-400" />;
+    if (trend === 'STABLE') return <Minus className="w-4 h-4 text-zinc-400" />;
+    return <span className="text-[10px] text-zinc-500 font-mono">--</span>;
+  };
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-zinc-950/40 border border-zinc-900 p-5 rounded-xl">
         <div>
-          <button 
-            onClick={() => setTab('dashboard')} 
+          <button
+            onClick={() => setTab('dashboard')}
             className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-white uppercase tracking-wider mb-2 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" /> Dashboard
           </button>
-          <h1 className="text-xl font-black text-white uppercase tracking-tight">Biometric Progress</h1>
+          <h1 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-cyan-400" />
+            Deterministic Progress Intelligence
+          </h1>
           <p className="text-xs text-zinc-400 mt-1">
-            Track real body weight fluctuations and circumference progression over time.
+            Real biometric telemetry, historical performance trends, and goal adherence. No estimates or fabricated claims.
           </p>
         </div>
 
-        <Button 
-          variant="primary" 
-          size="sm" 
+        <Button
+          variant="primary"
+          size="sm"
           onClick={() => setShowCheckInModal(true)}
-          className="w-full sm:w-auto text-xs uppercase"
+          className="w-full sm:w-auto text-xs uppercase cursor-pointer"
         >
           <Plus className="w-4 h-4 mr-1.5" /> Log Check-in
         </Button>
       </div>
 
-      {/* Weight History Line Chart */}
+      {/* 1. Overall Progress Status & Goal Card */}
+      <Card className="p-6 bg-gradient-to-r from-zinc-950/60 via-zinc-900/30 to-zinc-950/60 border-zinc-800" hoverEffect={false}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-zinc-850">
+          <div className="space-y-1">
+            <span className="text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest block">
+              30-Day Evaluation Period • Goal: {snapshot.goal}
+            </span>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-black text-white uppercase tracking-wide">
+                Progress Status
+              </h2>
+              {getOverallStatusBadge(snapshot.overallStatus)}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs font-mono text-zinc-400">
+            <ShieldCheck className="w-4 h-4 text-cyan-400" />
+            <span>Data Quality:</span>
+            <span className={`font-bold ${snapshot.dataQuality.status === 'GOOD' ? 'text-emerald-400' : snapshot.dataQuality.status === 'LIMITED' ? 'text-amber-400' : 'text-zinc-500'}`}>
+              {snapshot.dataQuality.status} ({snapshot.dataQuality.score}%)
+            </span>
+          </div>
+        </div>
+
+        <p className="text-xs text-zinc-300 mt-4 leading-relaxed max-w-3xl">
+          {snapshot.statusRationale}
+        </p>
+
+        {snapshot.dataQuality.reasons.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-zinc-900/60 flex flex-wrap gap-2">
+            {snapshot.dataQuality.reasons.map((r, i) => (
+              <span key={i} className="text-[10px] font-mono bg-zinc-900 px-2 py-0.5 rounded text-zinc-400 border border-zinc-850">
+                • {r}
+              </span>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* 2. Weight Trend Analysis & Line Chart */}
       <Card className="p-6 bg-zinc-950/40 border-zinc-850" hoverEffect={false}>
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-900/60">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-zinc-900/60">
           <div className="flex items-center gap-2">
             <Scale className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Weight Progress Trend</h3>
+            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Bodyweight Telemetry & Trend</h3>
           </div>
-          <span className="text-xs font-mono font-bold text-white">
-            {latestWeight ? `${latestWeight} kg current` : 'No weight check-ins'}
-          </span>
+          <div className="flex items-center gap-3 text-xs font-mono">
+            {snapshot.weight.currentWeightKg ? (
+              <>
+                <span className="text-white font-bold">{snapshot.weight.currentWeightKg} kg current</span>
+                {snapshot.weight.absoluteChangeKg !== null && (
+                  <span className={snapshot.weight.absoluteChangeKg < 0 ? 'text-cyan-400' : snapshot.weight.absoluteChangeKg > 0 ? 'text-emerald-400' : 'text-zinc-400'}>
+                    ({snapshot.weight.absoluteChangeKg > 0 ? '+' : ''}{snapshot.weight.absoluteChangeKg} kg • {snapshot.weight.percentageChange}%)
+                  </span>
+                )}
+                <span className="text-zinc-500">• Trend:</span>
+                <span className="text-cyan-300 font-bold uppercase">{snapshot.weight.trend}</span>
+              </>
+            ) : (
+              <span className="text-zinc-500">Awaiting baseline readings</span>
+            )}
+          </div>
         </div>
 
         {weights.length === 0 ? (
           <div className="py-12 text-center text-zinc-500 text-xs">
-            No weight entries recorded yet. Click "Log Check-in" above to log your first reading.
+            No weight history yet. Add measurements to start tracking your trend.
+          </div>
+        ) : weights.length === 1 ? (
+          <div className="py-10 text-center text-zinc-400 text-xs">
+            Single measurement logged ({weights[0].weightKg} kg on {weights[0].date}). Log at least one more reading over time to unlock deterministic rolling trend analysis.
           </div>
         ) : (
           <div className="w-full overflow-x-auto">
             <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-44 overflow-visible">
-              {/* Grid Lines */}
               <line x1={padding} y1={padding} x2={chartWidth - padding} y2={padding} stroke="#27272a" strokeDasharray="3 3" />
               <line x1={padding} y1={chartHeight - padding} x2={chartWidth - padding} y2={chartHeight - padding} stroke="#27272a" />
 
-              {/* Curve line */}
               {pathD && (
                 <path d={pathD} fill="none" stroke="#06b6d4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
               )}
 
-              {/* Data points */}
               {points.map((p, idx) => (
                 <g key={idx}>
                   <circle cx={p.x} cy={p.y} r="4.5" fill="#06b6d4" stroke="#09090b" strokeWidth="2" />
@@ -152,39 +318,173 @@ export const Progress: React.FC<ProgressProps> = ({
         )}
       </Card>
 
-      {/* Body Circumference Measurements */}
+      {/* 3. Workout & Nutrition Telemetry Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Workout Progress Card */}
+        <Card className="p-5 bg-zinc-950/40 border-zinc-850" hoverEffect={false}>
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-zinc-900/60">
+            <div className="flex items-center gap-2">
+              <Dumbbell className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Workout Consistency</h3>
+            </div>
+            <span className="text-xs font-mono font-bold text-cyan-400">
+              {snapshot.workouts.completionRate}% completion
+            </span>
+          </div>
+
+          {snapshot.workouts.sessionsCompleted === 0 ? (
+            <div className="py-8 text-center text-zinc-500 text-xs">
+              No completed workouts yet.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="p-2.5 rounded bg-zinc-900/50 border border-zinc-850 text-center">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase block">Completed</span>
+                  <span className="text-base font-black text-white font-mono">{snapshot.workouts.sessionsCompleted}</span>
+                </div>
+                <div className="p-2.5 rounded bg-zinc-900/50 border border-zinc-850 text-center">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase block">Total Sets</span>
+                  <span className="text-base font-black text-white font-mono">{snapshot.workouts.totalSetsCompleted}</span>
+                </div>
+                <div className="p-2.5 rounded bg-zinc-900/50 border border-zinc-850 text-center">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase block">Verified</span>
+                  <span className="text-base font-black text-cyan-400 font-mono">{snapshot.workouts.verifiedSetsCount}</span>
+                </div>
+              </div>
+
+              {snapshot.workouts.exercises.length > 0 && (
+                <div className="pt-2">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1.5">Tracked Exercises</span>
+                  <div className="space-y-1.5">
+                    {snapshot.workouts.exercises.slice(0, 3).map(ex => (
+                      <div key={ex.exerciseId} className="flex items-center justify-between text-xs font-mono bg-zinc-900/30 p-2 rounded border border-zinc-850/60">
+                        <span className="text-zinc-300 font-bold">{ex.exerciseName}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-zinc-500">{ex.bestReps} reps best</span>
+                          <span className="text-cyan-400 text-[10px] px-1.5 py-0.5 rounded bg-cyan-950/40 border border-cyan-800/30">{ex.progressionState}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+
+        {/* Nutrition Adherence Card */}
+        <Card className="p-5 bg-zinc-950/40 border-zinc-850" hoverEffect={false}>
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-zinc-900/60">
+            <div className="flex items-center gap-2">
+              <Flame className="w-4 h-4 text-amber-400" />
+              <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Nutrition Adherence</h3>
+            </div>
+            <span className="text-xs font-mono font-bold text-amber-400">
+              {snapshot.nutrition.loggingStatus}
+            </span>
+          </div>
+
+          {snapshot.nutrition.daysTracked === 0 ? (
+            <div className="py-8 text-center text-zinc-500 text-xs">
+              Nutrition tracking hasn't started yet.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-2.5 rounded bg-zinc-900/50 border border-zinc-850 text-center">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase block">Avg Calories</span>
+                  <span className="text-base font-black text-white font-mono">
+                    {snapshot.nutrition.averageCalories} <span className="text-[10px] text-zinc-500">/ {snapshot.nutrition.targetCalories}</span>
+                  </span>
+                </div>
+                <div className="p-2.5 rounded bg-zinc-900/50 border border-zinc-850 text-center">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase block">Avg Protein</span>
+                  <span className="text-base font-black text-cyan-400 font-mono">
+                    {snapshot.nutrition.averageProtein}g <span className="text-[10px] text-zinc-500">/ {snapshot.nutrition.targetProtein}g</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded bg-zinc-900/30 border border-zinc-850 text-xs text-zinc-400 font-mono flex items-center justify-between">
+                <span>Days Tracked: {snapshot.nutrition.daysTracked} / {snapshot.nutrition.totalDaysInPeriod}</span>
+                <span className="text-amber-300 font-bold">{snapshot.nutrition.trackingConsistencyRate}% consistency</span>
+              </div>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* 4. Body Circumference Measurements (cm) */}
       <Card className="p-6 bg-zinc-950/40 border-zinc-850" hoverEffect={false}>
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-900/60">
           <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Body Circumference Measurements (cm)</h3>
           <span className="text-[10px] text-zinc-500 font-mono">
-            {latestMeas ? `Last recorded: ${latestMeas.date}` : 'Awaiting baseline'}
+            {snapshot.measurements.latestRecordedDate ? `Last recorded: ${snapshot.measurements.latestRecordedDate}` : 'Awaiting baseline'}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-zinc-900/40 border border-zinc-850 p-4 rounded-xl">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Chest</span>
-            <span className="text-xl font-black text-white font-mono">{latestMeas?.chestCm ? `${latestMeas.chestCm} cm` : '--'}</span>
+        {snapshot.measurements.changes.length === 0 ? (
+          <div className="py-8 text-center text-zinc-500 text-xs">
+            No circumference sites recorded. Click "Log Check-in" to log chest, waist, arms, or thighs.
           </div>
-          <div className="bg-zinc-900/40 border border-zinc-850 p-4 rounded-xl">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Waist</span>
-            <span className="text-xl font-black text-white font-mono">{latestMeas?.waistCm ? `${latestMeas.waistCm} cm` : '--'}</span>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {snapshot.measurements.changes.map(m => (
+              <div key={m.site} className="bg-zinc-900/40 border border-zinc-850 p-4 rounded-xl">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">{m.site}</span>
+                  {getTrendIcon(m.trend)}
+                </div>
+                <div className="text-xl font-black text-white font-mono">{m.latestCm} cm</div>
+                {m.trend !== 'INSUFFICIENT_DATA' && (
+                  <div className={`text-[10px] font-mono mt-1 ${m.absoluteChangeCm < 0 ? 'text-cyan-400' : m.absoluteChangeCm > 0 ? 'text-amber-400' : 'text-zinc-500'}`}>
+                    {m.absoluteChangeCm > 0 ? '+' : ''}{m.absoluteChangeCm} cm ({m.percentageChange}%)
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-          <div className="bg-zinc-900/40 border border-zinc-850 p-4 rounded-xl">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Arms</span>
-            <span className="text-xl font-black text-white font-mono">{latestMeas?.armsCm ? `${latestMeas.armsCm} cm` : '--'}</span>
-          </div>
-          <div className="bg-zinc-900/40 border border-zinc-850 p-4 rounded-xl">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Thighs</span>
-            <span className="text-xl font-black text-white font-mono">{latestMeas?.thighsCm ? `${latestMeas.thighsCm} cm` : '--'}</span>
-          </div>
-        </div>
+        )}
       </Card>
+
+      {/* 5. Real Progress Events Timeline */}
+      {snapshot.timeline.length > 0 && (
+        <Card className="p-6 bg-zinc-950/40 border-zinc-850" hoverEffect={false}>
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-900/60">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Verified Telemetry Timeline</h3>
+            </div>
+            <span className="text-[10px] font-mono text-zinc-500">Real Events Log</span>
+          </div>
+
+          <div className="space-y-2.5">
+            {snapshot.timeline.slice(0, 8).map(evt => (
+              <div key={evt.id} className="flex items-start justify-between bg-zinc-900/30 border border-zinc-850/60 p-3 rounded-lg text-xs font-mono">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white">{evt.title}</span>
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded ${evt.type === 'MEASURED_FACT' ? 'bg-cyan-950/40 text-cyan-300 border border-cyan-800/40' : 'bg-emerald-950/40 text-emerald-300 border border-emerald-800/40'}`}>
+                      {evt.type === 'MEASURED_FACT' ? 'MEASURED FACT' : 'DETERMINISTIC TREND'}
+                    </span>
+                  </div>
+                  <p className="text-zinc-400 text-[11px]">{evt.description}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-[10px] text-zinc-500 block">{evt.date}</span>
+                  {evt.metricValue && <span className="text-cyan-400 font-bold text-xs">{evt.metricValue}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Check-In Modal */}
       <Modal isOpen={showCheckInModal} onClose={() => setShowCheckInModal(false)} title="BIOMETRIC CHECK-IN">
         <form onSubmit={handleCheckInSubmit} className="space-y-4 pt-2">
-          <Input 
+          <Input
             id="chk-weight"
             label="Current Bodyweight (kg)"
             type="number"
@@ -195,7 +495,7 @@ export const Progress: React.FC<ProgressProps> = ({
             required
           />
           <div className="grid grid-cols-2 gap-4">
-            <Input 
+            <Input
               id="chk-chest"
               label="Chest (cm, optional)"
               type="number"
@@ -204,7 +504,7 @@ export const Progress: React.FC<ProgressProps> = ({
               onChange={(e) => setNewChest(e.target.value)}
               placeholder="e.g. 104.0"
             />
-            <Input 
+            <Input
               id="chk-waist"
               label="Waist (cm, optional)"
               type="number"
@@ -215,7 +515,7 @@ export const Progress: React.FC<ProgressProps> = ({
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Input 
+            <Input
               id="chk-arms"
               label="Arms (cm, optional)"
               type="number"
@@ -224,7 +524,7 @@ export const Progress: React.FC<ProgressProps> = ({
               onChange={(e) => setNewArms(e.target.value)}
               placeholder="e.g. 37.0"
             />
-            <Input 
+            <Input
               id="chk-thighs"
               label="Thighs (cm, optional)"
               type="number"

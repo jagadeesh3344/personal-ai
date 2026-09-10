@@ -862,6 +862,75 @@ describe('FRIDAY Backend Integration & Security Tests', () => {
       expect(result.recipe.calories).toBeGreaterThan(0);
     });
   });
+
+  // 12. Phase 8: Progress Intelligence & Timeline
+  describe('12. Progress Intelligence & Timeline', () => {
+    it('GET /api/progress/intelligence returns deterministic snapshot', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/progress/intelligence?periodDays=30',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.intelligence).toBeDefined();
+      expect(body.intelligence.userId).toBe('user-a');
+      expect(body.intelligence.dataQuality).toBeDefined();
+      expect(body.intelligence.overallStatus).toBeDefined();
+      expect(body.intelligence.weightTrend).toBeDefined();
+      expect(body.intelligence.workoutProgress).toBeDefined();
+      expect(body.intelligence.nutritionAdherence).toBeDefined();
+      expect(body.intelligence.hydration).toBeDefined();
+      expect(body.intelligence.bodyMeasurements).toBeDefined();
+      expect(Array.isArray(body.intelligence.disclaimers)).toBe(true);
+    });
+
+    it('GET /api/progress/timeline returns chronological events', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/progress/timeline?periodDays=30',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(Array.isArray(body.timeline)).toBe(true);
+      for (const evt of body.timeline) {
+        expect(['MEASURED_FACT', 'DETERMINISTIC_TREND', 'AI_OBSERVATION', 'ESTIMATE']).toContain(evt.type);
+      }
+    });
+
+    it('enforces user isolation for progress intelligence', async () => {
+      const resA = await app.inject({
+        method: 'GET',
+        url: '/api/progress/intelligence',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+      const resB = await app.inject({
+        method: 'GET',
+        url: '/api/progress/intelligence',
+        headers: { authorization: `Bearer ${userBToken}` }
+      });
+      expect(resA.statusCode).toBe(200);
+      expect(resB.statusCode).toBe(200);
+
+      const bodyA = JSON.parse(resA.body);
+      const bodyB = JSON.parse(resB.body);
+      expect(bodyA.intelligence.userId).toBe('user-a');
+      expect(bodyB.intelligence.userId).toBe('user-b');
+    });
+
+    it('FRIDAY tool getProgressIntelligence returns real deterministic snapshot', async () => {
+      const { executeBackendTool } = await import('../src/modules/friday/tools/fridayTools.js');
+      const result: any = await executeBackendTool('user-a', 'getProgressIntelligence', { periodDays: 30 });
+      expect(result).toBeDefined();
+      expect(result.userId).toBe('user-a');
+      expect(result.dataQuality).toBeDefined();
+      expect(result.weightTrend).toBeDefined();
+      expect(result.disclaimers.length).toBeGreaterThan(0);
+    });
+  });
 });
 
 

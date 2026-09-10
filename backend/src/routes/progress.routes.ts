@@ -17,6 +17,24 @@ export async function progressRoutes(fastify: FastifyInstance) {
     return reply.send({ success: true, progress });
   });
 
+  // GET /api/progress/intelligence
+  fastify.get('/progress/intelligence', async (request, reply) => {
+    const userId = request.user!.id;
+    const query = request.query as { periodDays?: string };
+    const periodDays = query.periodDays ? parseInt(query.periodDays, 10) : 30;
+    const intelligence = await ProgressService.getProgressIntelligence(userId, periodDays);
+    return reply.send({ success: true, intelligence });
+  });
+
+  // GET /api/progress/timeline
+  fastify.get('/progress/timeline', async (request, reply) => {
+    const userId = request.user!.id;
+    const query = request.query as { periodDays?: string };
+    const periodDays = query.periodDays ? parseInt(query.periodDays, 10) : 30;
+    const timeline = await ProgressService.getProgressTimeline(userId, periodDays);
+    return reply.send({ success: true, timeline });
+  });
+
   // POST /api/progress/measurements
   fastify.post('/progress/measurements', async (request, reply) => {
     const userId = request.user!.id;

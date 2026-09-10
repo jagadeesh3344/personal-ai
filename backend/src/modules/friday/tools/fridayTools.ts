@@ -138,6 +138,16 @@ export const FRIDAY_TOOL_DEFINITIONS: ToolDefinition[] = [
         exerciseId: { type: 'string', description: 'Optional exercise ID (e.g. "knee-push-up", "wall-push-up", "box-squat") to evaluate' }
       }
     }
+  },
+  {
+    name: 'getProgressIntelligence',
+    description: 'Retrieves comprehensive deterministic progress intelligence for the authenticated user, including weight trend direction, workout completion rates, exercise progression states, nutrition adherence, body measurements, data quality, and goal-aligned status.',
+    parameters: {
+      type: 'object',
+      properties: {
+        periodDays: { type: 'number', description: 'Evaluation window in days (default 30)' }
+      }
+    }
   }
 ];
 
@@ -253,6 +263,9 @@ export async function executeBackendTool(
     }
     case 'getProgressSummary': {
       return ProgressService.getProgress(userId);
+    }
+    case 'getProgressIntelligence': {
+      return ProgressService.getProgressIntelligence(userId, args.periodDays ? Number(args.periodDays) : 30);
     }
     case 'getExerciseHistory': {
       return WorkoutsService.getExerciseHistoryWithProgression(userId, args.exerciseId);
