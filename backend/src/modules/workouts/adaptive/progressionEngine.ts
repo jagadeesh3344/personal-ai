@@ -98,12 +98,14 @@ export function findProgressionFamily(exerciseId: string): { ladder: Progression
  */
 export function isStepCompatible(step: ProgressionLadderStep, context: UserContext): boolean {
   // 1. Training experience hard constraint
-  // Hard rule: Beginner or Intermediate must NEVER be prescribed an ADVANCED exercise under any circumstance
-  if (context.trainingExperience === 'BEGINNER') {
-    if (step.level === 'ADVANCED') {
+  // Hard rule: BEGINNER athletes must NEVER receive INTERMEDIATE or ADVANCED exercises.
+  // INTERMEDIATE athletes must NEVER receive ADVANCED exercises.
+  const exp = (context.trainingExperience || 'BEGINNER').toUpperCase();
+  if (exp === 'BEGINNER') {
+    if (step.level !== 'BEGINNER') {
       return false;
     }
-  } else if (context.trainingExperience === 'INTERMEDIATE') {
+  } else if (exp === 'INTERMEDIATE') {
     if (step.level === 'ADVANCED') {
       return false;
     }

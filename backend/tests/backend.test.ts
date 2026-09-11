@@ -931,6 +931,96 @@ describe('FRIDAY Backend Integration & Security Tests', () => {
       expect(result.disclaimers.length).toBeGreaterThan(0);
     });
   });
+
+  // 13. FRIDAY Coaching Intelligence & Personal Trainer Orchestration
+  describe('13. FRIDAY Coaching Intelligence & Orchestration', () => {
+    it('GET /api/friday/coaching/today returns authoritative daily coaching brief', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/friday/coaching/today',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.brief).toBeDefined();
+      expect(body.brief.userId).toBe('user-a');
+      expect(body.brief.priority).toBeDefined();
+      expect(body.brief.priorityRationale).toBeDefined();
+      expect(body.brief.workout).toBeDefined();
+      expect(body.brief.nutrition).toBeDefined();
+      expect(body.brief.hydration).toBeDefined();
+      expect(body.brief.progress).toBeDefined();
+      expect(body.brief.nextRecommendedAction).toBeDefined();
+    });
+
+    it('GET /api/friday/coaching/weekly returns 7-day retrospective review', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/friday/coaching/weekly',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.review).toBeDefined();
+      expect(body.review.userId).toBe('user-a');
+      expect(body.review.workoutConsistencyRate).toBeDefined();
+      expect(body.review.nextFocus).toBeDefined();
+      expect(Array.isArray(body.review.keyAccomplishments)).toBe(true);
+      expect(Array.isArray(body.review.areasNeedingAttention)).toBe(true);
+    });
+
+    it('enforces user isolation for daily coaching briefs', async () => {
+      const resA = await app.inject({
+        method: 'GET',
+        url: '/api/friday/coaching/today',
+        headers: { authorization: `Bearer ${userAToken}` }
+      });
+      const resB = await app.inject({
+        method: 'GET',
+        url: '/api/friday/coaching/today',
+        headers: { authorization: `Bearer ${userBToken}` }
+      });
+      expect(resA.statusCode).toBe(200);
+      expect(resB.statusCode).toBe(200);
+
+      const bodyA = JSON.parse(resA.body);
+      const bodyB = JSON.parse(resB.body);
+      expect(bodyA.brief.userId).toBe('user-a');
+      expect(bodyB.brief.userId).toBe('user-b');
+    });
+
+    it('executes FRIDAY coaching tools deterministically', async () => {
+      const { executeBackendTool } = await import('../src/modules/friday/tools/fridayTools.js');
+
+      // 1. getTodayCoachingContext
+      const briefResult: any = await executeBackendTool('user-a', 'getTodayCoachingContext', {});
+      expect(briefResult).toBeDefined();
+      expect(briefResult.userId).toBe('user-a');
+      expect(briefResult.priority).toBeDefined();
+
+      // 2. getWeeklyCoachingReview
+      const reviewResult: any = await executeBackendTool('user-a', 'getWeeklyCoachingReview', {});
+      expect(reviewResult).toBeDefined();
+      expect(reviewResult.userId).toBe('user-a');
+      expect(reviewResult.workoutConsistencyRate).toBeDefined();
+
+      // 3. getCoachingPriority
+      const priorityResult: any = await executeBackendTool('user-a', 'getCoachingPriority', {});
+      expect(priorityResult).toBeDefined();
+      expect(priorityResult.priority).toBeDefined();
+      expect(priorityResult.rationale).toBeDefined();
+
+      // 4. updateUserPreferences
+      const prefResult: any = await executeBackendTool('user-a', 'updateUserPreferences', {
+        dislikedExercises: ['burpees'],
+        notes: 'Testing preference tool'
+      });
+      expect(prefResult).toBeDefined();
+      expect(prefResult.success).toBe(true);
+    });
+  });
 });
 
 

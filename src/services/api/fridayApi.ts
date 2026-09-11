@@ -50,6 +50,14 @@ export const fridayApi = {
 
   async getHistory(conversationId: string) {
     return apiClient.get<{ success: boolean; messages: any[] }>(`/friday/history/${conversationId}`);
+  },
+
+  async getTodayCoaching() {
+    return apiClient.get<{ success: boolean; coaching: any }>('/friday/coaching/today');
+  },
+
+  async getWeeklyCoaching() {
+    return apiClient.get<{ success: boolean; review: any }>('/friday/coaching/weekly');
   }
 };
 

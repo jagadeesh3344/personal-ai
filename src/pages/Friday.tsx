@@ -1,12 +1,32 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Bot, Send, Sparkles, Mic, MicOff, Volume2, Square, AlertCircle, RefreshCw } from 'lucide-react';
+import { 
+  Bot, 
+  Send, 
+  Sparkles, 
+  Mic, 
+  MicOff, 
+  Volume2, 
+  Square, 
+  AlertCircle, 
+  RefreshCw,
+  Dumbbell,
+  Utensils,
+  Droplets,
+  TrendingUp,
+  Calendar,
+  X,
+  Award,
+  ChevronRight,
+  ShieldCheck
+} from 'lucide-react';
 import { FridayMessage as FridayMessageType, UserProfile } from '../types';
 import { FridayMessage } from '../components/friday/FridayMessage';
 import { fridayApi } from '../services/api/fridayApi';
 import { WebSpeechVoiceProvider } from '../services/voice/WebSpeechVoiceProvider';
 import { VoiceConnectionState } from '../services/voice/VoiceProvider';
+import { DailyCoachingBrief, WeeklyCoachingReview } from '../features/friday/coaching/types';
 
 interface FridayProps {
   messages: FridayMessageType[];
@@ -28,6 +48,42 @@ export const Friday: React.FC<FridayProps> = ({
   const [liveTranscript, setLiveTranscript] = useState<string>('');
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const voiceProviderRef = useRef<WebSpeechVoiceProvider | null>(null);
+
+  // Phase 9 Coaching Intelligence state
+  const [coachingBrief, setCoachingBrief] = useState<DailyCoachingBrief | null>(null);
+  const [isLoadingCoaching, setIsLoadingCoaching] = useState(false);
+  const [weeklyReview, setWeeklyReview] = useState<WeeklyCoachingReview | null>(null);
+  const [showWeeklyModal, setShowWeeklyModal] = useState(false);
+
+  const loadCoachingBrief = async () => {
+    setIsLoadingCoaching(true);
+    try {
+      const res = await fridayApi.getTodayCoaching();
+      if (res.success && res.coaching) {
+        setCoachingBrief(res.coaching);
+      }
+    } catch (e) {
+      console.warn('Could not load coaching brief', e);
+    } finally {
+      setIsLoadingCoaching(false);
+    }
+  };
+
+  const loadWeeklyReview = async () => {
+    try {
+      const res = await fridayApi.getWeeklyCoaching();
+      if (res.success && res.review) {
+        setWeeklyReview(res.review);
+        setShowWeeklyModal(true);
+      }
+    } catch (e) {
+      console.warn('Could not load weekly review', e);
+    }
+  };
+
+  useEffect(() => {
+    loadCoachingBrief();
+  }, []);
 
   const quickPrompts = [
     "What's my workout today?",
@@ -218,6 +274,73 @@ export const Friday: React.FC<FridayProps> = ({
         </div>
       </div>
 
+      {/* Phase 9 Coaching Intelligence Priority HUD */}
+      {coachingBrief && (
+        <div className="mb-4 bg-zinc-950/80 border border-zinc-800/80 rounded-xl p-3.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className={`px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase ${
+              coachingBrief.priority === 'WORKOUT' ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400' :
+              coachingBrief.priority === 'NUTRITION' ? 'bg-amber-500/15 border border-amber-500/30 text-amber-400' :
+              coachingBrief.priority === 'HYDRATION' ? 'bg-cyan-500/15 border border-cyan-500/30 text-cyan-400' :
+              'bg-indigo-500/15 border border-indigo-500/30 text-indigo-400'
+            }`}>
+              PRIORITY: {coachingBrief.priority}
+            </div>
+            <div className="text-xs text-zinc-300 font-medium">
+              <span className="text-zinc-500 mr-1.5 font-bold uppercase text-[10px]">NEXT ACTION:</span>
+              {coachingBrief.nextRecommendedAction}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadWeeklyReview}
+              className="text-[11px] py-1 px-2.5 h-auto text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/10 cursor-pointer"
+            >
+              <Calendar className="w-3.5 h-3.5 mr-1" /> Weekly Review
+            </Button>
+            <button
+              onClick={loadCoachingBrief}
+              disabled={isLoadingCoaching}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition cursor-pointer"
+              title="Refresh coaching status"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingCoaching ? 'animate-spin text-cyan-400' : ''}`} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Real Action Contextual Toolbar */}
+      <div className="flex flex-wrap items-center gap-2 mb-4 shrink-0">
+        <button
+          onClick={() => handleSendMessage("Start my workout.")}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-500/30 text-emerald-300 text-xs font-semibold cursor-pointer transition"
+        >
+          <Dumbbell className="w-3.5 h-3.5" /> Start Workout
+        </button>
+        <button
+          onClick={() => handleSendMessage("What should I eat now?")}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-950/40 hover:bg-amber-900/50 border border-amber-500/30 text-amber-300 text-xs font-semibold cursor-pointer transition"
+        >
+          <Utensils className="w-3.5 h-3.5" /> Meal Recommendation
+        </button>
+        <button
+          onClick={() => handleSendMessage("I drank 500 ml of water.")}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-500/30 text-cyan-300 text-xs font-semibold cursor-pointer transition"
+        >
+          <Droplets className="w-3.5 h-3.5" /> +500 ml Water
+        </button>
+        <button
+          onClick={() => handleSendMessage("How am I progressing?")}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-500/30 text-indigo-300 text-xs font-semibold cursor-pointer transition"
+        >
+          <TrendingUp className="w-3.5 h-3.5" /> Progress Intelligence
+        </button>
+      </div>
+
       {/* Main Layout Grid */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 overflow-hidden mb-4 min-h-0">
         {/* Left Column: Voice Assistant Controls & Core */}
@@ -385,6 +508,129 @@ export const Friday: React.FC<FridayProps> = ({
           </form>
         </div>
       </div>
+
+      {/* Phase 9 Weekly Coaching Review Modal */}
+      {showWeeklyModal && weeklyReview && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden shadow-2xl animate-fade-in">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-zinc-900 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">7-Day Coaching Review</h3>
+                  <p className="text-[10px] text-zinc-500 font-mono">
+                    {weeklyReview.startDate} to {weeklyReview.endDate}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowWeeklyModal(false)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-850 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5 overflow-y-auto space-y-4">
+              {/* Summary Stats Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase block mb-1">Workouts</span>
+                  <div className="text-base font-black text-white">
+                    {weeklyReview.workoutsCompleted} <span className="text-xs font-normal text-zinc-500">/ {weeklyReview.workoutsPlanned}</span>
+                  </div>
+                  <span className="text-[10px] text-emerald-400 font-mono">{weeklyReview.workoutConsistencyRate}% consistency</span>
+                </div>
+
+                <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase block mb-1">Nutrition</span>
+                  <div className="text-base font-black text-white">
+                    {weeklyReview.nutritionDaysTracked} <span className="text-xs font-normal text-zinc-500">/ 7 days</span>
+                  </div>
+                  <span className="text-[10px] text-amber-400 font-mono">
+                    {weeklyReview.averageDailyCalories ? `${weeklyReview.averageDailyCalories} kcal avg` : 'Untracked'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase block mb-1">Hydration</span>
+                  <div className="text-base font-black text-white">
+                    {weeklyReview.hydrationAverageMl ? `${weeklyReview.hydrationAverageMl}` : '0'} <span className="text-xs font-normal text-zinc-500">ml/day</span>
+                  </div>
+                  <span className="text-[10px] text-cyan-400 font-mono">{weeklyReview.hydrationConsistencyRate}% tracked</span>
+                </div>
+
+                <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase block mb-1">Weight Trend</span>
+                  <div className="text-base font-black text-white">
+                    {weeklyReview.weightTrend.currentWeightKg ? `${weeklyReview.weightTrend.currentWeightKg} kg` : 'No data'}
+                  </div>
+                  <span className="text-[10px] text-indigo-400 font-mono">
+                    {weeklyReview.weightTrend.changeKg !== null
+                      ? `${weeklyReview.weightTrend.changeKg > 0 ? '+' : ''}${weeklyReview.weightTrend.changeKg} kg (${weeklyReview.weightTrend.direction})`
+                      : 'Insufficient data'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Accomplishments */}
+              {weeklyReview.keyAccomplishments.length > 0 && (
+                <div className="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-xl space-y-2">
+                  <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-wider">
+                    <Award className="w-4 h-4" /> Key Accomplishments
+                  </div>
+                  <ul className="space-y-1.5 text-xs text-zinc-300">
+                    {weeklyReview.keyAccomplishments.map((acc, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-emerald-400 font-bold">•</span>
+                        <span>{acc}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Areas Needing Attention */}
+              {weeklyReview.areasNeedingAttention.length > 0 && (
+                <div className="p-4 bg-amber-950/20 border border-amber-500/20 rounded-xl space-y-2">
+                  <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
+                    <AlertCircle className="w-4 h-4" /> Areas Needing Attention
+                  </div>
+                  <ul className="space-y-1.5 text-xs text-zinc-300">
+                    {weeklyReview.areasNeedingAttention.map((area, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-amber-400 font-bold">•</span>
+                        <span>{area}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Next Week Focus */}
+              <div className="p-4 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-1">
+                <span className="text-[10px] text-cyan-400 font-mono font-bold uppercase tracking-wider block">
+                  Next Training Cycle Focus
+                </span>
+                <p className="text-xs text-white font-medium leading-relaxed">
+                  {weeklyReview.nextFocus}
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-zinc-900 flex justify-end">
+              <Button variant="primary" size="sm" onClick={() => setShowWeeklyModal(false)}>
+                Close Review
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

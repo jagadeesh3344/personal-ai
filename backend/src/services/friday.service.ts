@@ -1,6 +1,8 @@
 import { FridayAgent, FridayAgentResponse } from '../modules/friday/FridayAgent.js';
 import { FridayRepository } from '../repositories/friday.repo.js';
 
+import { CoachingEngine } from '../modules/friday/coaching/coachingEngine.js';
+
 const agentInstance = new FridayAgent();
 
 export class FridayService {
@@ -34,4 +36,11 @@ export class FridayService {
     return FridayRepository.getRecentMessages(userId, conversationId, 30);
   }
 
+  static async getTodayCoaching(userId: string) {
+    return CoachingEngine.getTodayCoaching(userId);
+  }
+
+  static async getWeeklyCoaching(userId: string) {
+    return CoachingEngine.getWeeklyCoaching(userId);
+  }
 }

@@ -129,7 +129,7 @@ describe('Phase 8: Progress Intelligence Unit Tests', () => {
     exerciseId: string,
     date: string,
     setNumber: number,
-    targetReps: number,
+    targetReps: number | string,
     actualReps: number,
     completed: boolean = true,
     verification: 'VERIFIED' | 'SELF_REPORTED' = 'VERIFIED'
@@ -140,7 +140,7 @@ describe('Phase 8: Progress Intelligence Unit Tests', () => {
       date,
       sessionId,
       setNumber,
-      targetReps,
+      targetReps: String(targetReps),
       actualReps,
       completed,
       completionMethod: 'CAMERA',

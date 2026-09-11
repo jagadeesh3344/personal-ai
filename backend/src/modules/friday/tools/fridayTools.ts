@@ -4,6 +4,7 @@ import { WorkoutsService } from '../../../services/workouts.service.js';
 import { NutritionService } from '../../../services/nutrition.service.js';
 import { HydrationService } from '../../../services/hydration.service.js';
 import { ProgressService } from '../../../services/progress.service.js';
+import { CoachingEngine } from '../coaching/coachingEngine.js';
 
 export const FRIDAY_TOOL_DEFINITIONS: ToolDefinition[] = [
   {
@@ -148,6 +149,32 @@ export const FRIDAY_TOOL_DEFINITIONS: ToolDefinition[] = [
         periodDays: { type: 'number', description: 'Evaluation window in days (default 30)' }
       }
     }
+  },
+  {
+    name: 'getTodayCoachingContext',
+    description: 'Retrieves the authoritative daily coaching brief, including today workout status, nutrition adherence, hydration status, progress status, current coaching priority, and next recommended action.',
+    parameters: { type: 'object', properties: {} }
+  },
+  {
+    name: 'getWeeklyCoachingReview',
+    description: 'Retrieves the authoritative weekly coaching review for the past 7 days, including workouts completed, consistency %, exercise improvements, nutrition tracking days, calorie & protein adherence, hydration consistency, weight trend, key accomplishments, areas needing attention, and next focus.',
+    parameters: { type: 'object', properties: {} }
+  },
+  {
+    name: 'getCoachingPriority',
+    description: 'Evaluates the user immediate coaching priority (PROFILE_SETUP, WORKOUT, NUTRITION, HYDRATION, RECOVERY, PROGRESS_TRACKING) and returns the rationale and next recommended action.',
+    parameters: { type: 'object', properties: {} }
+  },
+  {
+    name: 'updateUserPreferences',
+    description: 'Deterministically updates the user fitness preferences, equipment inventory, schedule, or disliked exercises in the database and long-term memory.',
+    parameters: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'The natural language preference statement, e.g. "I bought dumbbells", "I dislike burpees", "I prefer vegetarian meals"' }
+      },
+      required: ['message']
+    }
   }
 ];
 
@@ -269,6 +296,23 @@ export async function executeBackendTool(
     }
     case 'getExerciseHistory': {
       return WorkoutsService.getExerciseHistoryWithProgression(userId, args.exerciseId);
+    }
+    case 'getTodayCoachingContext': {
+      return CoachingEngine.getTodayCoaching(userId);
+    }
+    case 'getWeeklyCoachingReview': {
+      return CoachingEngine.getWeeklyCoaching(userId);
+    }
+    case 'getCoachingPriority': {
+      const brief = await CoachingEngine.getTodayCoaching(userId);
+      return {
+        priority: brief.priority,
+        rationale: brief.priorityRationale,
+        nextRecommendedAction: brief.nextRecommendedAction
+      };
+    }
+    case 'updateUserPreferences': {
+      return CoachingEngine.handlePreferenceOrProfileUpdate(userId, args.message || '');
     }
     default:
       throw new Error(`Unhandled tool: ${toolName}`);

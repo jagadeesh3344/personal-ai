@@ -59,15 +59,16 @@ export class WorkoutsService {
   ): ExerciseDef[] {
     const equip = (userEquipment && userEquipment.length > 0) ? userEquipment : ['NONE'];
     const hasZeroEquip = equip.includes('NONE') && equip.length === 1;
+    const exp = (trainingExperience || 'BEGINNER').toUpperCase();
 
     return BACKEND_EXERCISES.filter(ex => {
       // 1. Difficulty gating:
       // - BEGINNER: only BEGINNER exercises.
       // - INTERMEDIATE: BEGINNER + INTERMEDIATE exercises.
       // - ADVANCED: BEGINNER + INTERMEDIATE + ADVANCED exercises.
-      if (trainingExperience === 'BEGINNER') {
+      if (exp === 'BEGINNER') {
         if (ex.difficulty !== 'BEGINNER') return false;
-      } else if (trainingExperience === 'INTERMEDIATE') {
+      } else if (exp === 'INTERMEDIATE') {
         if (ex.difficulty !== 'BEGINNER' && ex.difficulty !== 'INTERMEDIATE') return false;
       }
 
@@ -95,8 +96,9 @@ export class WorkoutsService {
 
   static async getProgressionStates(userId: string): Promise<ExerciseProgressionState[]> {
     const profile = await ProfileRepository.getProfile(userId);
+    const exp = ((profile?.trainingExperience as any) || 'BEGINNER').toUpperCase();
     const context = {
-      trainingExperience: (profile?.trainingExperience as any) || 'BEGINNER',
+      trainingExperience: exp,
       equipment: profile?.equipment || ['NONE'],
       trainingEnvironment: profile?.trainingEnvironment || 'HOME'
     };
@@ -112,8 +114,9 @@ export class WorkoutsService {
     const history = await WorkoutsRepository.getExerciseHistory(userId, exerciseId);
     const sessions = aggregateExerciseSessions(history);
     const profile = await ProfileRepository.getProfile(userId);
+    const exp = ((profile?.trainingExperience as any) || 'BEGINNER').toUpperCase();
     const context = {
-      trainingExperience: (profile?.trainingExperience as any) || 'BEGINNER',
+      trainingExperience: exp,
       equipment: profile?.equipment || ['NONE'],
       trainingEnvironment: profile?.trainingEnvironment || 'HOME'
     };
@@ -148,7 +151,7 @@ export class WorkoutsService {
     const profile = await ProfileRepository.getProfile(userId);
     const env = profile?.trainingEnvironment || 'HOME';
     const equip = profile?.equipment || ['NONE'];
-    const exp = (profile?.trainingExperience as any) || 'BEGINNER';
+    const exp = ((profile?.trainingExperience as any) || 'BEGINNER').toUpperCase();
     const compatible = this.getCompatibleExercises(env, equip, exp);
 
     const historyItems = await WorkoutsRepository.getExerciseHistory(userId);
@@ -172,7 +175,12 @@ export class WorkoutsService {
       );
 
       // Find full definition if exercise was progressed or regressed to a different exercise
-      const finalEx = BACKEND_EXERCISES.find(e => e.id === recommendation.recommendedExerciseId) || ex;
+      let finalEx = BACKEND_EXERCISES.find(e => e.id === recommendation.recommendedExerciseId) || ex;
+      if (exp === 'BEGINNER' && finalEx.difficulty !== 'BEGINNER') {
+        finalEx = ex;
+      } else if (exp === 'INTERMEDIATE' && finalEx.difficulty === 'ADVANCED') {
+        finalEx = ex;
+      }
 
       return {
         order: idx + 1,

@@ -46,4 +46,26 @@ export async function fridayRoutes(fastify: FastifyInstance) {
       return reply.status(404).send({ success: false, error: err.message });
     }
   });
+
+  // GET /api/friday/coaching/today
+  fastify.get('/friday/coaching/today', async (request, reply) => {
+    const userId = request.user!.id;
+    try {
+      const brief = await FridayService.getTodayCoaching(userId);
+      return reply.send({ success: true, coaching: brief, brief });
+    } catch (err: any) {
+      return reply.status(500).send({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/friday/coaching/weekly
+  fastify.get('/friday/coaching/weekly', async (request, reply) => {
+    const userId = request.user!.id;
+    try {
+      const review = await FridayService.getWeeklyCoaching(userId);
+      return reply.send({ success: true, review });
+    } catch (err: any) {
+      return reply.status(500).send({ success: false, error: err.message });
+    }
+  });
 }

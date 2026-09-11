@@ -5,6 +5,10 @@ import { FRIDAY_TOOL_DEFINITIONS, executeBackendTool } from './tools/fridayTools
 import { FridayRepository } from '../../repositories/friday.repo.js';
 import { ProfileRepository } from '../../repositories/profile.repo.js';
 import { logFridayEvent } from './ai/fridayLogger.js';
+import { classifyIntent } from './coaching/coachingRules.js';
+import { buildCoachingContext } from './coaching/coachingContext.js';
+import { CoachingEngine } from './coaching/coachingEngine.js';
+import { ENHANCED_FRIDAY_SYSTEM_PROMPT, buildDynamicCoachingPrompt } from './coaching/coachingPrompts.js';
 
 export interface FridayAgentResponse {
   conversationId: string;
@@ -40,39 +44,41 @@ export class FridayAgent {
     // 2. Persist user incoming message
     await FridayRepository.saveMessage(userId, conversation.id, 'user', messageText);
 
-    // 3. Load short-term history, long-term memory, and user equipment profile
-    const recentMessages = await FridayRepository.getRecentMessages(userId, conversation.id, 10);
-    const longTermMemories = await FridayRepository.getLongTermMemories(userId);
-    const profile = await ProfileRepository.getProfile(userId);
-
-    // 4. Construct equipment safety & memory context
-    let memoryPrompt = '';
-    if (longTermMemories.length > 0) {
-      memoryPrompt += `\n### USER'S ESTABLISHED PREFERENCES & MEMORY:\n` +
-        longTermMemories.map(m => `- ${m.key}: ${m.value}`).join('\n');
+    // 3. Deterministic Intent Classification & Immediate Preference Mutation if applicable
+    const intent = classifyIntent(messageText);
+    if (intent === 'PREFERENCE_UPDATE' || intent === 'PROFILE_UPDATE') {
+      try {
+        await CoachingEngine.handlePreferenceOrProfileUpdate(userId, messageText);
+      } catch (err: any) {
+        console.warn('[FridayAgent] Preference update error:', err.message);
+      }
     }
 
-    const equipmentConstraint = `\n### USER PROFILE & EQUIPMENT SAFETY CONSTRAINTS:\n` +
-      `- Environment: ${profile?.trainingEnvironment || 'HOME'}\n` +
-      `- Stored Equipment: ${(profile?.equipment || ['NONE']).join(', ')}\n` +
-      `- Fitness Goal: ${profile?.goal || 'GENERAL_FITNESS'}\n` +
-      `STRICT RULE: Never recommend equipment not listed above. The deterministic workout engine is the ultimate authority.\n`;
+    // 4. Build targeted Coaching Context on-demand
+    const coachingContext = await buildCoachingContext(userId, intent);
+    const recentMessages = await FridayRepository.getRecentMessages(userId, conversation.id, 10);
 
-    const fullSystemInstruction = `${FRIDAY_SYSTEM_PROMPT}${equipmentConstraint}${memoryPrompt}`;
+    // 5. Construct authoritative system prompt with safety constraints and active workout state
+    const dynamicPrompt = buildDynamicCoachingPrompt(coachingContext);
+    const workoutModeConstraint = coachingContext.activeWorkoutContext
+      ? '\nCRITICAL INSTRUCTION: Athlete is in an active workout session. Keep your spoken response ultra-concise (1-2 sentences maximum).'
+      : '';
+
+    const fullSystemInstruction = `${ENHANCED_FRIDAY_SYSTEM_PROMPT}${dynamicPrompt}${workoutModeConstraint}`;
 
     const formattedMessages: ChatMessage[] = recentMessages.map(m => ({
       role: m.sender === 'friday' ? 'model' : 'user',
       content: m.text
     }));
 
-    // 5. Query Gemini Provider with registered tools
+    // 6. Query Gemini Provider with registered tools
     const initialResult = await this.aiProvider.generate({
       systemInstruction: fullSystemInstruction,
       messages: formattedMessages,
       tools: FRIDAY_TOOL_DEFINITIONS
     });
 
-    // 6. Handle Tool Calling Loop if requested by model
+    // 7. Handle Tool Calling Loop if requested by model
     const executedTools: Array<{ name: string; arguments: Record<string, any>; result: any }> = [];
     let finalReply = initialResult.text;
 
@@ -154,6 +160,31 @@ export class FridayAgent {
   }
 
   private formatFallbackFromToolResults(tools: Array<{ name: string; result: any }>): string {
+    const errorTool = tools.find(t => t.result?.error);
+    if (errorTool) {
+      return `I couldn't complete that action: ${errorTool.result.error}. Please try again.`;
+    }
+
+    const coachingBrief = tools.find(t => t.name === 'getTodayCoachingContext');
+    if (coachingBrief && !coachingBrief.result.error) {
+      return `Today's Coaching Priority is ${coachingBrief.result.priority}. ${coachingBrief.result.nextRecommendedAction}`;
+    }
+
+    const weeklyReview = tools.find(t => t.name === 'getWeeklyCoachingReview');
+    if (weeklyReview && !weeklyReview.result.error) {
+      return `Weekly Review: You completed ${weeklyReview.result.workoutsCompleted} workouts this week (${weeklyReview.result.workoutConsistencyRate}% consistency). Key focus: ${weeklyReview.result.nextFocus}`;
+    }
+
+    const priorityTool = tools.find(t => t.name === 'getCoachingPriority');
+    if (priorityTool && !priorityTool.result.error) {
+      return `Current Priority: ${priorityTool.result.priority}. ${priorityTool.result.nextRecommendedAction}`;
+    }
+
+    const prefTool = tools.find(t => t.name === 'updateUserPreferences');
+    if (prefTool && !prefTool.result.error) {
+      return prefTool.result.confirmationText || "I have saved your updated preferences to your profile.";
+    }
+
     const hydrTool = tools.find(t => t.name === 'logHydration');
     if (hydrTool && !hydrTool.result.error) {
       const amount = hydrTool.result.entry?.amountMl || 500;
