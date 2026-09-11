@@ -132,7 +132,8 @@ describe('Phase 8: Progress Intelligence Unit Tests', () => {
     targetReps: number | string,
     actualReps: number,
     completed: boolean = true,
-    verification: 'VERIFIED' | 'SELF_REPORTED' = 'VERIFIED'
+    verification: 'VERIFIED' | 'SELF_REPORTED' = 'VERIFIED',
+    weightKg: number = 0
   ): ExerciseHistoryItem {
     return {
       exerciseId,
@@ -142,6 +143,7 @@ describe('Phase 8: Progress Intelligence Unit Tests', () => {
       setNumber,
       targetReps: String(targetReps),
       actualReps,
+      weightKg,
       completed,
       completionMethod: 'CAMERA',
       verification

@@ -478,9 +478,10 @@ describe('Phase 9: Coaching Intelligence & Personal Trainer Orchestration', () =
 
       expect(recommendation).toBeDefined();
       expect(['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK']).toContain(recommendation.mealType);
-      expect(recommendation.recipe.calories).toBeLessThanOrEqual(defaultTargets.targetCalories);
+      expect(recommendation.recipe).not.toBeNull();
+      expect(recommendation.recipe!.calories).toBeLessThanOrEqual(defaultTargets.targetCalories);
       // Allergies: Peanuts must not be in the recipe
-      expect(recommendation.recipe.allergens).not.toContain('Peanuts');
+      expect(recommendation.recipe!.allergens).not.toContain('Peanuts');
     });
   });
 
