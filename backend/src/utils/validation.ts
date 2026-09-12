@@ -143,5 +143,5 @@ export const CheckinCreateSchema = z.object({
 export const PhotoUploadUrlSchema = z.object({
   pose: z.enum(['FRONT', 'SIDE', 'BACK']),
   fileExtension: z.string().regex(/^(jpg|jpeg|png|webp)$/i),
-  checkinId: z.string().uuid().optional()
+  checkinId: z.string().optional()
 });

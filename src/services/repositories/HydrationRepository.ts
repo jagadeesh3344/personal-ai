@@ -49,9 +49,21 @@ class ApiBackedHydrationRepository implements IHydrationRepository {
       localStorage.setItem(this.getKey(dateStr), JSON.stringify(current));
     }
 
-    // Backend sync
-    hydrationApi.logHydration(amountMl, dateStr).catch(err => {
-      console.warn('[HydrationRepository] Background water log sync failed:', err.message);
+    // Backend sync with optimistic rollback on failure
+    hydrationApi.logHydration(amountMl, dateStr).then(entry => {
+      if (entry && entry.id) {
+        newEntry.id = entry.id;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(this.getKey(dateStr), JSON.stringify(current));
+        }
+      }
+    }).catch(err => {
+      console.warn('[HydrationRepository] Background water log sync failed. Rolling back optimistic state:', err.message);
+      current.consumedMl = Math.max(0, current.consumedMl - amountMl);
+      current.entries = current.entries.filter(e => e.id !== newEntry.id);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(this.getKey(dateStr), JSON.stringify(current));
+      }
     });
 
     return current;

@@ -204,7 +204,8 @@ export function evaluateCoachingPriority(
   hydrationSummary: { consumedMl: number; targetMl: number } | null | undefined
 ): { priority: CoachingPriority; rationale: string } {
   // 1. Profile Setup / Onboarding Check
-  if (!profile || !profile.goal || !profile.trainingExperience || !profile.equipment) {
+  const equip = (profile as any)?.equipment || (profile as any)?.availableEquipment;
+  if (!profile || !profile.goal || !profile.trainingExperience || !equip) {
     return {
       priority: 'PROFILE_SETUP',
       rationale: 'Profile biometrics, fitness goal, or equipment inventory need initialization.'

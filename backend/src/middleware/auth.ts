@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { getSupabaseAdmin, createUserClient } from '../config/supabase.js';
+import { env } from '../config/env.js';
 
 export async function authenticate(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
@@ -11,11 +12,10 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
     });
   }
 
-
   const token = authHeader.substring(7).trim();
 
-  // Test mode & Dev mode token support
-  if (token.startsWith('test-token-') || token.startsWith('dev-token-') || token === 'dev-token') {
+  // Test mode & Dev mode token support (strictly blocked in staging & production)
+  if ((env.NODE_ENV === 'development' || env.NODE_ENV === 'test') && (token.startsWith('test-token-') || token.startsWith('dev-token-') || token === 'dev-token')) {
     const userId = token.startsWith('test-token-')
       ? token.replace('test-token-', '')
       : (token.startsWith('dev-token-') ? token.replace('dev-token-', '') : 'dev-user-1');

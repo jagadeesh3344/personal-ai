@@ -4,8 +4,10 @@ import { TodayScore } from '../components/dashboard/TodayScore';
 import { TodayMissions } from '../components/dashboard/TodayMissions';
 import { WorkoutCard } from '../components/dashboard/WorkoutCard';
 import { NutritionCard } from '../components/dashboard/NutritionCard';
-import { FridayInsightCard } from '../components/dashboard/FridayInsightCard';
 import { HydrationCard } from '../components/dashboard/HydrationCard';
+import { TodayFocusHero } from '../components/dashboard/TodayFocusHero';
+import { ProgressSummaryCard } from '../components/dashboard/ProgressSummaryCard';
+import { TodayFridayChatBar } from '../components/dashboard/TodayFridayChatBar';
 import { 
   UserProfile, 
   WorkoutPlan, 
@@ -14,9 +16,11 @@ import {
   NutritionTargets, 
   Meal, 
   DailyHydration, 
-  DailyTask 
+  DailyTask,
+  ProgressState
 } from '../types';
-import { Sparkles } from 'lucide-react';
+import { DailyCoachingBrief } from '../features/friday/coaching/types';
+import { Sparkles, Bot } from 'lucide-react';
 
 interface DashboardProps {
   userProfile: UserProfile;
@@ -31,6 +35,11 @@ interface DashboardProps {
   setTab: (tab: string) => void;
   onAddMealClick: () => void;
   onAddWater: (ml: number) => void;
+  coachingBrief?: DailyCoachingBrief | null;
+  isLoadingCoaching?: boolean;
+  onRefreshCoaching?: () => void;
+  onQuickAskFriday?: (prompt: string) => void;
+  progressData?: ProgressState | null;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -45,7 +54,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onToggleTask,
   setTab,
   onAddMealClick,
-  onAddWater
+  onAddWater,
+  coachingBrief = null,
+  isLoadingCoaching = false,
+  onRefreshCoaching,
+  onQuickAskFriday,
+  progressData = null
 }) => {
   const getGreeting = () => {
     const hr = new Date().getHours();
@@ -54,7 +68,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return 'Good evening';
   };
 
-  const currentCalories = meals.reduce((acc, m) => acc + m.totalCalories, 0);
   const currentProtein = meals.reduce((acc, m) => acc + m.totalProtein, 0);
   const targetProtein = nutritionTargets?.proteinGrams || 140;
   const targetWater = hydration.targetMl || 2500;
@@ -63,26 +76,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const waterPct = Math.min(100, Math.round((hydration.consumedMl / targetWater) * 100));
   const workoutDone = activeSession?.completed || false;
 
-  // Real, dynamic insight generation
-  let dynamicInsight = `Welcome back, ${userProfile.name}. `;
-  if (!workoutDone && todayWorkout) {
-    dynamicInsight += `Your primary mission today is "${todayWorkout.dayName}". Ensure you consume adequate hydration before training.`;
-  } else if (currentProtein < targetProtein) {
-    const short = Math.round(targetProtein - currentProtein);
-    dynamicInsight += `Workout completed, but you are currently ${short}g short of your protein target. Prioritize a lean protein dinner.`;
-  } else {
-    dynamicInsight += `Outstanding discipline today. Both your workout and nutrition objectives are firmly on track.`;
-  }
+  const handleHeroActionClick = (destination: string) => {
+    if (destination === 'quick_water_500') {
+      onAddWater(500);
+      if (onRefreshCoaching) onRefreshCoaching();
+    } else {
+      setTab(destination);
+    }
+  };
+
+  const handleChatSendMessage = (prompt: string) => {
+    if (onQuickAskFriday) {
+      onQuickAskFriday(prompt);
+    }
+    setTab('friday');
+  };
 
   return (
-    <div className="space-y-6 animate-fade-in pb-8">
-      {/* Header section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-zinc-950/60 p-5 rounded-xl border border-zinc-900">
+    <div className="space-y-6 animate-fade-in pb-12 max-w-7xl mx-auto">
+      {/* 1. Header with FRIDAY Greeting & Status */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-zinc-950/60 p-5 rounded-2xl border border-zinc-900 shadow-sm">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
             <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">
-              FRIDAY Core System
+              FRIDAY AI Coach Orchestration
             </span>
           </div>
           <h1 className="text-2xl font-black text-white uppercase tracking-tight">
@@ -93,37 +111,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </p>
         </div>
         
-        <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-850 p-3 rounded-lg text-xs self-start md:self-auto">
-          <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-          <div className="font-mono">
-            <span className="text-zinc-500 font-bold uppercase block text-[8px]">Trainer Status</span>
-            <span className="text-zinc-200 font-bold">FRIDAY Coach V2.0</span>
+        <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-850 px-4 py-2.5 rounded-xl text-xs self-start md:self-auto">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+          <div>
+            <span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-wider">Coach Status</span>
+            <span className="text-zinc-200 font-mono font-bold text-xs">ONLINE & AUTHORITATIVE</span>
           </div>
         </div>
       </div>
 
-      {/* Row 1: Adherence score, Body status, and missions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="h-full">
-          <TodayScore 
-            workoutDone={workoutDone} 
-            proteinPct={proteinPct} 
-            waterPct={waterPct} 
-          />
-        </div>
-        <div className="h-full">
-          <BodyStatusCard 
-            currentWeight={userProfile.currentWeightKg} 
-            targetWeight={userProfile.targetWeightKg} 
-          />
-        </div>
-        <div className="h-full">
-          <TodayMissions tasks={tasks} onToggleTask={onToggleTask} />
-        </div>
-      </div>
+      {/* 2. Primary Next Action: TODAY'S FOCUS Hero Card */}
+      <TodayFocusHero
+        coachingBrief={coachingBrief}
+        isLoading={isLoadingCoaching}
+        onRefresh={onRefreshCoaching}
+        onActionClick={handleHeroActionClick}
+      />
 
-      {/* Row 2: Workout, Nutrition, Hydration, FRIDAY Insight */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* 3. Core Four Pillars: Workout, Nutrition, Hydration, Progress */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         <div className="h-full">
           <WorkoutCard 
             todayWorkout={todayWorkout} 
@@ -145,10 +151,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
           />
         </div>
         <div className="h-full">
-          <FridayInsightCard 
-            onAskFriday={() => setTab('friday')} 
-            insight={dynamicInsight} 
+          <ProgressSummaryCard 
+            coachingBrief={coachingBrief}
+            progressData={progressData}
+            onViewProgress={() => setTab('progress')}
           />
+        </div>
+      </div>
+
+      {/* 4. Inline FRIDAY Chat/Voice Bar */}
+      <TodayFridayChatBar
+        onSendMessage={handleChatSendMessage}
+        onOpenFridayTab={() => setTab('friday')}
+      />
+
+      {/* 5. Metrics & Daily Missions Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="h-full">
+          <TodayScore 
+            workoutDone={workoutDone} 
+            proteinPct={proteinPct} 
+            waterPct={waterPct} 
+          />
+        </div>
+        <div className="h-full">
+          <BodyStatusCard 
+            currentWeight={userProfile.currentWeightKg} 
+            targetWeight={userProfile.targetWeightKg} 
+          />
+        </div>
+        <div className="h-full">
+          <TodayMissions tasks={tasks} onToggleTask={onToggleTask} />
         </div>
       </div>
     </div>

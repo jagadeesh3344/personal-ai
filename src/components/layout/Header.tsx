@@ -29,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const getPageTitle = (tab: string) => {
     switch (tab) {
-      case 'dashboard': return 'Dashboard';
+      case 'dashboard': return 'Today';
       case 'workout': return 'Today\'s Workout';
       case 'nutrition': return 'Nutrition & Water';
       case 'habits': return 'Your Habits';

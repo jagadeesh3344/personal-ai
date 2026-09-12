@@ -227,8 +227,8 @@ export async function executeBackendTool(
         weightKg,
         reps,
         completed: args.completed ?? true,
-        completionMethod: args.completionMethod || 'VOICE',
-        verification: args.verification || 'SELF_REPORTED'
+        completionMethod: 'VOICE',
+        verification: 'SELF_REPORTED'
       });
     }
     case 'completeWorkout': {

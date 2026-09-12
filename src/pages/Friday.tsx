@@ -32,12 +32,18 @@ interface FridayProps {
   messages: FridayMessageType[];
   setMessages: React.Dispatch<React.SetStateAction<FridayMessageType[]>>;
   userProfile: UserProfile;
+  initialPrompt?: string | null;
+  onClearInitialPrompt?: () => void;
+  onCoachingStateChanged?: () => void;
 }
 
 export const Friday: React.FC<FridayProps> = ({
   messages,
   setMessages,
-  userProfile
+  userProfile,
+  initialPrompt,
+  onClearInitialPrompt,
+  onCoachingStateChanged
 }) => {
   const [inputText, setInputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -85,6 +91,13 @@ export const Friday: React.FC<FridayProps> = ({
     loadCoachingBrief();
   }, []);
 
+  useEffect(() => {
+    if (initialPrompt && initialPrompt.trim()) {
+      handleSendMessage(initialPrompt.trim());
+      if (onClearInitialPrompt) onClearInitialPrompt();
+    }
+  }, [initialPrompt]);
+
   const quickPrompts = [
     "What's my workout today?",
     "Start my workout.",
@@ -127,6 +140,10 @@ export const Friday: React.FC<FridayProps> = ({
           provider.setConversationId(newConvId);
         }
         const hasTools = toolCalls && toolCalls.length > 0;
+        if (hasTools) {
+          if (onCoachingStateChanged) onCoachingStateChanged();
+          loadCoachingBrief();
+        }
         const replyMsg: FridayMessageType = {
           id: `fri-v-${Date.now()}`,
           sender: 'friday',
@@ -207,6 +224,10 @@ export const Friday: React.FC<FridayProps> = ({
           }
         }
         const hasTools = response.data.toolCalls && response.data.toolCalls.length > 0;
+        if (hasTools) {
+          if (onCoachingStateChanged) onCoachingStateChanged();
+          loadCoachingBrief();
+        }
         const replyMsg: FridayMessageType = {
           id: `fri-${Date.now()}`,
           sender: 'friday',
@@ -406,11 +427,38 @@ export const Friday: React.FC<FridayProps> = ({
               )}
             </div>
 
-            {/* Error Notification if any */}
+            {/* Section 22: Voice Error Notification & Fallback */}
             {voiceError && (
-              <div className="flex items-center gap-2 p-2.5 mt-3 bg-red-950/50 border border-red-900/50 rounded-lg text-left text-xs text-red-300 max-w-xs">
-                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                <span>{voiceError}</span>
+              <div className="flex flex-col gap-2 p-3 mt-3 bg-red-950/60 border border-red-900/60 rounded-xl text-left text-xs text-red-300 max-w-xs animate-fade-in">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span className="font-bold">Microphone access isn't available.</span>
+                </div>
+                <p className="text-[11px] text-zinc-400 leading-snug">
+                  {voiceError}
+                </p>
+                <div className="flex items-center gap-2 pt-1">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleToggleVoice}
+                    className="text-[10px] py-1 px-2.5 h-auto uppercase min-h-[32px]"
+                  >
+                    Try Again
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setVoiceError(null);
+                      const inputEl = document.querySelector('input[placeholder*="Speak or type"]') as HTMLInputElement;
+                      if (inputEl) inputEl.focus();
+                    }}
+                    className="text-[10px] py-1 px-2.5 h-auto uppercase min-h-[32px]"
+                  >
+                    Type Instead
+                  </Button>
+                </div>
               </div>
             )}
 

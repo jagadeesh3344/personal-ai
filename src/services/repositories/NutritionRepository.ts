@@ -47,6 +47,7 @@ class ApiBackedNutritionRepository implements INutritionRepository {
     const target = meals.find(m => m.id === mealId);
     if (!target) return;
 
+    const prevItems = [...target.items];
     target.items.push(item);
     target.totalCalories = target.items.reduce((acc, curr) => acc + curr.calories, 0);
     target.totalProtein = target.items.reduce((acc, curr) => acc + curr.protein, 0);
@@ -55,11 +56,17 @@ class ApiBackedNutritionRepository implements INutritionRepository {
 
     this.saveMeals(dateStr, meals);
 
-    // Sync to backend
+    // Sync to backend with rollback on persistent failure
     nutritionApi.updateMeal(target.id, target).catch(() => {
       // Fallback: create meal if not yet existing on backend
       nutritionApi.createMeal(target).catch(err => {
-        console.warn('[NutritionRepository] Background meal sync failed:', err.message);
+        console.warn('[NutritionRepository] Background meal sync failed. Rolling back:', err.message);
+        target.items = prevItems;
+        target.totalCalories = target.items.reduce((acc, curr) => acc + curr.calories, 0);
+        target.totalProtein = target.items.reduce((acc, curr) => acc + curr.protein, 0);
+        target.totalCarbs = target.items.reduce((acc, curr) => acc + curr.carbs, 0);
+        target.totalFat = target.items.reduce((acc, curr) => acc + curr.fat, 0);
+        this.saveMeals(dateStr, meals);
       });
     });
   }
@@ -69,6 +76,8 @@ class ApiBackedNutritionRepository implements INutritionRepository {
     const target = meals.find(m => m.id === mealId);
     if (!target) return;
 
+    const removedItem = target.items.find(i => i.id === itemId);
+    const prevItems = [...target.items];
     target.items = target.items.filter(i => i.id !== itemId);
     target.totalCalories = target.items.reduce((acc, curr) => acc + curr.calories, 0);
     target.totalProtein = target.items.reduce((acc, curr) => acc + curr.protein, 0);
@@ -78,7 +87,15 @@ class ApiBackedNutritionRepository implements INutritionRepository {
     this.saveMeals(dateStr, meals);
 
     nutritionApi.updateMeal(target.id, target).catch(err => {
-      console.warn('[NutritionRepository] Background item removal sync failed:', err.message);
+      console.warn('[NutritionRepository] Background item removal sync failed. Rolling back:', err.message);
+      if (removedItem) {
+        target.items = prevItems;
+        target.totalCalories = target.items.reduce((acc, curr) => acc + curr.calories, 0);
+        target.totalProtein = target.items.reduce((acc, curr) => acc + curr.protein, 0);
+        target.totalCarbs = target.items.reduce((acc, curr) => acc + curr.carbs, 0);
+        target.totalFat = target.items.reduce((acc, curr) => acc + curr.fat, 0);
+        this.saveMeals(dateStr, meals);
+      }
     });
   }
 

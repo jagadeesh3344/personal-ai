@@ -22,11 +22,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   streakDays
 }) => {
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { id: 'workout', label: 'Workout Tracker', icon: <Dumbbell className="w-5 h-5" /> },
-    { id: 'nutrition', label: 'Nutrition & Water', icon: <Apple className="w-5 h-5" /> },
-    { id: 'habits', label: 'Habits Board', icon: <CheckSquare className="w-5 h-5" /> },
-    { id: 'progress', label: 'Your Progress', icon: <LineChart className="w-5 h-5" /> },
+    { id: 'dashboard', label: 'Today', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { id: 'workout', label: 'Workout', icon: <Dumbbell className="w-5 h-5" /> },
+    { id: 'nutrition', label: 'Nutrition', icon: <Apple className="w-5 h-5" /> },
+    { id: 'progress', label: 'Progress', icon: <LineChart className="w-5 h-5" /> },
+    { id: 'habits', label: 'Habits', icon: <CheckSquare className="w-5 h-5" /> },
   ];
 
   return (
@@ -114,6 +114,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <Settings className="w-5 h-5 text-zinc-500" />
           <span className="text-xs font-semibold tracking-wide">Settings & Profile</span>
+        </button>
+        <button
+          onClick={() => setTab('beta-dashboard')}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer text-left mt-1 ${
+            currentTab === 'beta-dashboard'
+              ? 'bg-zinc-900 text-indigo-400 font-semibold'
+              : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          <span className="text-xs">📊</span>
+          <span className="text-[11px] font-medium tracking-wide">Beta Telemetry</span>
         </button>
       </div>
     </aside>

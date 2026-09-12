@@ -39,6 +39,7 @@ interface ProgressProps {
   onAddMeasurement: (record: { date: string; chestCm?: number; waistCm?: number; armsCm?: number; thighsCm?: number }) => void;
   setTab: (tab: string) => void;
   userProfile?: UserProfile | null;
+  onAskFriday?: (prompt?: string) => void;
 }
 
 export const Progress: React.FC<ProgressProps> = ({
@@ -46,7 +47,8 @@ export const Progress: React.FC<ProgressProps> = ({
   onAddWeight,
   onAddMeasurement,
   setTab,
-  userProfile
+  userProfile,
+  onAskFriday
 }) => {
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [newWeight, setNewWeight] = useState('');
@@ -54,6 +56,10 @@ export const Progress: React.FC<ProgressProps> = ({
   const [newWaist, setNewWaist] = useState('');
   const [newArms, setNewArms] = useState('');
   const [newThighs, setNewThighs] = useState('');
+  const [frontPhotoName, setFrontPhotoName] = useState<string | null>(null);
+  const [sidePhotoName, setSidePhotoName] = useState<string | null>(null);
+  const [backPhotoName, setBackPhotoName] = useState<string | null>(null);
+  const [reflectionNotes, setReflectionNotes] = useState('');
 
   const [backendSnapshot, setBackendSnapshot] = useState<ProgressSnapshot | null>(null);
   const [loadingIntelligence, setLoadingIntelligence] = useState(false);
@@ -200,7 +206,7 @@ export const Progress: React.FC<ProgressProps> = ({
             onClick={() => setTab('dashboard')}
             className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-white uppercase tracking-wider mb-2 cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" /> Dashboard
+            <ArrowLeft className="w-4 h-4" /> Today
           </button>
           <h1 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-cyan-400" />
@@ -211,14 +217,27 @@ export const Progress: React.FC<ProgressProps> = ({
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setShowCheckInModal(true)}
-          className="w-full sm:w-auto text-xs uppercase cursor-pointer"
-        >
-          <Plus className="w-4 h-4 mr-1.5" /> Log Check-in
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {onAskFriday && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onAskFriday("Am I progressing towards my fitness goal?")}
+              className="text-xs uppercase cursor-pointer min-h-[44px]"
+            >
+              Ask FRIDAY
+            </Button>
+          )}
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setShowCheckInModal(true)}
+            className="w-full sm:w-auto text-xs uppercase cursor-pointer min-h-[44px]"
+          >
+            <Plus className="w-4 h-4 mr-1.5" /> Monthly Check-in
+          </Button>
+        </div>
       </div>
 
       {/* 1. Overall Progress Status & Goal Card */}
@@ -481,9 +500,18 @@ export const Progress: React.FC<ProgressProps> = ({
         </Card>
       )}
 
-      {/* Check-In Modal */}
-      <Modal isOpen={showCheckInModal} onClose={() => setShowCheckInModal(false)} title="BIOMETRIC CHECK-IN">
+      {/* Section 19 & 20: Monthly Biometric & Visual Check-In Modal */}
+      <Modal isOpen={showCheckInModal} onClose={() => setShowCheckInModal(false)} title="MONTHLY FITNESS CHECK-IN">
         <form onSubmit={handleCheckInSubmit} className="space-y-4 pt-2">
+          {/* Section 20: Photo & Camera Privacy UX Notice */}
+          <div className="p-3 bg-zinc-900/80 border border-zinc-800 rounded-xl flex items-start gap-2.5 text-xs text-zinc-400">
+            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold text-zinc-200 block text-[11px] uppercase tracking-wider">Photo & Camera Privacy</span>
+              Progress photos are stored in private, user-isolated cloud storage and accessed strictly via temporary 1-hour signed URLs. They are never public, never shared, and never sent to AI models. Optical camera frames during workouts are processed 100% on-device and never leave your phone.
+            </div>
+          </div>
+
           <Input
             id="chk-weight"
             label="Current Bodyweight (kg)"
@@ -534,12 +562,72 @@ export const Progress: React.FC<ProgressProps> = ({
               placeholder="e.g. 58.0"
             />
           </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={() => setShowCheckInModal(false)}>
+
+          {/* Monthly Progress Photos (Optional) */}
+          <div className="space-y-2 pt-1 border-t border-zinc-900">
+            <span className="text-xs font-bold text-zinc-300 block uppercase tracking-wider">
+              Progress Photos (Optional)
+            </span>
+            <div className="grid grid-cols-3 gap-2">
+              <label className="flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-zinc-800 hover:border-cyan-500/40 bg-zinc-900/40 text-center cursor-pointer transition">
+                <Camera className="w-4 h-4 text-cyan-400 mb-1" />
+                <span className="text-[10px] font-bold text-zinc-300 uppercase">Front</span>
+                <span className="text-[9px] text-zinc-500 truncate max-w-[80px]">{frontPhotoName || 'Select'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => setFrontPhotoName(e.target.files?.[0]?.name || null)}
+                />
+              </label>
+
+              <label className="flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-zinc-800 hover:border-cyan-500/40 bg-zinc-900/40 text-center cursor-pointer transition">
+                <Camera className="w-4 h-4 text-cyan-400 mb-1" />
+                <span className="text-[10px] font-bold text-zinc-300 uppercase">Side</span>
+                <span className="text-[9px] text-zinc-500 truncate max-w-[80px]">{sidePhotoName || 'Select'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => setSidePhotoName(e.target.files?.[0]?.name || null)}
+                />
+              </label>
+
+              <label className="flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-zinc-800 hover:border-cyan-500/40 bg-zinc-900/40 text-center cursor-pointer transition">
+                <Camera className="w-4 h-4 text-cyan-400 mb-1" />
+                <span className="text-[10px] font-bold text-zinc-300 uppercase">Back</span>
+                <span className="text-[9px] text-zinc-500 truncate max-w-[80px]">{backPhotoName || 'Select'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => setBackPhotoName(e.target.files?.[0]?.name || null)}
+                />
+              </label>
+            </div>
+          </div>
+
+          {/* Reflection & Subjective Adherence */}
+          <div className="space-y-1 pt-1">
+            <label htmlFor="chk-notes" className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">
+              Monthly Reflection & Adherence (Optional)
+            </label>
+            <textarea
+              id="chk-notes"
+              rows={2}
+              value={reflectionNotes}
+              onChange={e => setReflectionNotes(e.target.value)}
+              placeholder="How do you feel this cycle? (e.g. Energy levels high, recovery on squats was great)"
+              className="w-full bg-zinc-900 border border-zinc-800 focus:border-cyan-500 rounded-xl p-2.5 text-xs text-white outline-none resize-none"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-zinc-900">
+            <Button type="button" variant="outline" onClick={() => setShowCheckInModal(false)} className="min-h-[44px]">
               Cancel
             </Button>
-            <Button type="submit" variant="primary">
-              Commit Check-in
+            <Button type="submit" variant="primary" className="min-h-[44px]">
+              Save Check-in
             </Button>
           </div>
         </form>

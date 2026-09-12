@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { MobileNav } from './components/layout/MobileNav';
@@ -16,13 +16,15 @@ import {
   FridayMessage,
   Habit 
 } from './types';
+import { DailyCoachingBrief } from './features/friday/coaching/types';
 
-// Repositories
+// Repositories & APIs
 import { ProfileRepository } from './services/repositories/ProfileRepository';
 import { WorkoutRepository } from './services/repositories/WorkoutRepository';
 import { NutritionRepository } from './services/repositories/NutritionRepository';
 import { HydrationRepository } from './services/repositories/HydrationRepository';
 import { ProgressRepository } from './services/repositories/ProgressRepository';
+import { fridayApi } from './services/api/fridayApi';
 
 // Calculators & Generator
 import { calculateNutritionTargets } from './utils/nutritionCalculator';
@@ -38,6 +40,9 @@ import { Habits } from './pages/Habits';
 import { Progress as ProgressPage } from './pages/Progress';
 import { Friday as FridayPage } from './pages/Friday';
 import { Settings as SettingsPage } from './pages/Settings';
+import { BetaDashboard } from './pages/BetaDashboard';
+import { FeedbackModal } from './components/feedback/FeedbackModal';
+import { AnalyticsService } from './services/telemetry/analyticsService';
 
 export default function App() {
   const todayStr = new Date().toISOString().split('T')[0];
@@ -59,6 +64,16 @@ export default function App() {
   );
   const [progressData, setProgressData] = useState<ProgressState>(() => ProgressRepository.getProgress());
 
+  // Phase 10: Central Coaching Intelligence Brief & Quick Interaction State
+  const [coachingBrief, setCoachingBrief] = useState<DailyCoachingBrief | null>(null);
+  const [isLoadingCoaching, setIsLoadingCoaching] = useState<boolean>(false);
+  const [pendingFridayPrompt, setPendingFridayPrompt] = useState<string | null>(null);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    AnalyticsService.trackEvent('APP_OPENED');
+  }, []);
+
   const [habits, setHabits] = useState<Habit[]>(() => [
     { id: 'h1', name: 'Workout Routine', icon: 'Dumbbell', streak: 0, weeklyHistory: { Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false }, currentCompleted: false },
     { id: 'h2', name: 'Protein Target', icon: 'Beef', streak: 0, weeklyHistory: { Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false }, currentCompleted: false },
@@ -75,6 +90,20 @@ export default function App() {
     }
   ]);
 
+  // Centralized coaching brief fetcher for seamless state synchronization
+  const refreshCoachingBrief = useCallback(async () => {
+    setIsLoadingCoaching(true);
+    try {
+      const res = await fridayApi.getTodayCoaching();
+      if (res.success && res.coaching) {
+        setCoachingBrief(res.coaching);
+      }
+    } catch (e) {
+      console.warn('[App] Could not refresh coaching brief:', e);
+    } finally {
+      setIsLoadingCoaching(false);
+    }
+  }, []);
 
   // Sync profile edits to ProfileRepository
   useEffect(() => {
@@ -100,7 +129,8 @@ export default function App() {
     ProgressRepository.syncFromBackend().then(pr => {
       if (pr) setProgressData(pr);
     });
-  }, [todayStr]);
+    refreshCoachingBrief();
+  }, [todayStr, refreshCoachingBrief]);
 
   // Determine active workout session for today
   const activeSession = sessions.find(s => s.dayId && !s.completed) || (sessions.length > 0 ? sessions[0] : null);
@@ -141,20 +171,23 @@ export default function App() {
     }
   ];
 
-  // Actions
+  // Actions with instant UI state synchronization
   const handleAddWater = (amountMl: number) => {
     const updated = HydrationRepository.logWater(todayStr, amountMl, targetHydrationMl);
     setHydration({ ...updated });
+    refreshCoachingBrief();
   };
 
   const handleDeleteWaterEntry = (entryId: string) => {
     const updated = HydrationRepository.removeEntry(todayStr, entryId);
     setHydration({ ...updated });
+    refreshCoachingBrief();
   };
 
   const handleAddMealItem = (mealId: string, item: MealItem) => {
     NutritionRepository.addMealItem(todayStr, mealId, item);
     setMeals(NutritionRepository.getMeals(todayStr));
+    refreshCoachingBrief();
   };
 
   const handleDeleteMealItem = (mealId: string, itemIdx: number) => {
@@ -162,11 +195,13 @@ export default function App() {
     if (!meal || !meal.items[itemIdx]) return;
     NutritionRepository.removeMealItem(todayStr, mealId, meal.items[itemIdx].id);
     setMeals(NutritionRepository.getMeals(todayStr));
+    refreshCoachingBrief();
   };
 
   const handleUpdateSession = (session: WorkoutSession) => {
     WorkoutRepository.saveSession(session);
     setSessions(WorkoutRepository.getSessions());
+    refreshCoachingBrief();
   };
 
   const handleCompleteSession = (session: WorkoutSession) => {
@@ -177,6 +212,7 @@ export default function App() {
     };
     WorkoutRepository.saveSession(finished);
     setSessions(WorkoutRepository.getSessions());
+    refreshCoachingBrief();
 
     const confirmationMsg: FridayMessage = {
       id: `msg-${Date.now()}`,
@@ -199,11 +235,13 @@ export default function App() {
         updatedAt: new Date().toISOString()
       });
     }
+    refreshCoachingBrief();
   };
 
   const handleAddMeasurement = (meas: { date: string; chestCm?: number; waistCm?: number; armsCm?: number; thighsCm?: number }) => {
     const updated = ProgressRepository.addMeasurement(meas);
     setProgressData({ ...updated });
+    refreshCoachingBrief();
   };
 
   const handleOnboardingComplete = (profile: UserProfile) => {
@@ -238,6 +276,7 @@ export default function App() {
     setProgressData(ProgressRepository.getProgress());
 
     setIsOnboarded(true);
+    refreshCoachingBrief();
   };
 
   const handleResetOnboarding = () => {
@@ -254,7 +293,13 @@ export default function App() {
     setMeals(NutritionRepository.getMeals(todayStr));
     setHydration(HydrationRepository.getHydration(todayStr, 2500));
     setProgressData(ProgressRepository.getProgress());
+    setCoachingBrief(null);
     setCurrentTab('dashboard');
+  };
+
+  const handleQuickAskFriday = (prompt: string) => {
+    setPendingFridayPrompt(prompt);
+    setCurrentTab('friday');
   };
 
   if (!isOnboarded || !userProfile) {
@@ -278,6 +323,11 @@ export default function App() {
             setTab={setCurrentTab}
             onAddMealClick={() => setCurrentTab('nutrition')}
             onAddWater={handleAddWater}
+            coachingBrief={coachingBrief}
+            isLoadingCoaching={isLoadingCoaching}
+            onRefreshCoaching={refreshCoachingBrief}
+            onQuickAskFriday={handleQuickAskFriday}
+            progressData={progressData}
           />
         );
       case 'workout':
@@ -289,6 +339,7 @@ export default function App() {
             onUpdateSession={handleUpdateSession}
             onCompleteSession={handleCompleteSession}
             setTab={setCurrentTab}
+            onAskFriday={handleQuickAskFriday}
           />
         );
       case 'nutrition':
@@ -303,6 +354,7 @@ export default function App() {
             onDeleteWaterEntry={handleDeleteWaterEntry}
             setTab={setCurrentTab}
             userProfile={userProfile}
+            onAskFriday={handleQuickAskFriday}
           />
         );
       case 'habits':
@@ -320,6 +372,8 @@ export default function App() {
             onAddWeight={handleAddWeight}
             onAddMeasurement={handleAddMeasurement}
             setTab={setCurrentTab}
+            userProfile={userProfile}
+            onAskFriday={handleQuickAskFriday}
           />
         );
       case 'friday':
@@ -328,6 +382,9 @@ export default function App() {
             messages={fridayMessages}
             setMessages={setFridayMessages}
             userProfile={userProfile}
+            initialPrompt={pendingFridayPrompt}
+            onClearInitialPrompt={() => setPendingFridayPrompt(null)}
+            onCoachingStateChanged={refreshCoachingBrief}
           />
         );
       case 'settings':
@@ -339,13 +396,15 @@ export default function App() {
             onResetOnboarding={handleResetOnboarding}
           />
         );
+      case 'beta-dashboard':
+        return <BetaDashboard />;
       default:
         return null;
     }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex font-sans select-none antialiased">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex font-sans select-none antialiased relative">
       {/* Sidebar Layout */}
       <Sidebar 
         currentTab={currentTab} 
@@ -367,6 +426,22 @@ export default function App() {
           {renderTabContent()}
         </main>
       </div>
+
+      {/* Floating Beta Feedback Button */}
+      <button
+        onClick={() => setIsFeedbackOpen(true)}
+        className="fixed bottom-20 md:bottom-6 right-6 z-40 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs py-2 px-3.5 rounded-full shadow-lg border border-indigo-400/40 flex items-center gap-1.5 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+        title="Send Beta Feedback"
+      >
+        <span>💬</span>
+        <span className="hidden sm:inline">Beta Feedback</span>
+      </button>
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+      />
 
       {/* Mobile Navigation bar */}
       <MobileNav currentTab={currentTab} setTab={setCurrentTab} />

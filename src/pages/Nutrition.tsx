@@ -21,6 +21,7 @@ interface NutritionProps {
   onDeleteWaterEntry: (id: string) => void;
   setTab: (tab: string) => void;
   userProfile?: UserProfile | null;
+  onAskFriday?: (prompt?: string) => void;
 }
 
 export const Nutrition: React.FC<NutritionProps> = ({
@@ -32,7 +33,8 @@ export const Nutrition: React.FC<NutritionProps> = ({
   onAddWater,
   onDeleteWaterEntry,
   setTab,
-  userProfile
+  userProfile,
+  onAskFriday
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeMealId, setActiveMealId] = useState<string>('m-breakfast');
@@ -116,13 +118,24 @@ export const Nutrition: React.FC<NutritionProps> = ({
             onClick={() => setTab('dashboard')} 
             className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-white uppercase tracking-wider mb-2 cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" /> Dashboard
+            <ArrowLeft className="w-4 h-4" /> Today
           </button>
           <h1 className="text-xl font-black text-white uppercase tracking-tight">Nutrition & Hydration</h1>
           <p className="text-xs text-zinc-400 mt-1">
             Mifflin-St Jeor goal targets: {targetCalories} kcal | {targetProtein}g Protein | {targetWaterLiters}L Water
           </p>
         </div>
+
+        {onAskFriday && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onAskFriday("What should I eat next based on my remaining calories and protein?")}
+            className="text-xs uppercase cursor-pointer min-h-[44px]"
+          >
+            Ask FRIDAY Meal Coach
+          </Button>
+        )}
       </div>
 
       {/* Macro HUD Summary with Actual vs Target and Remaining */}

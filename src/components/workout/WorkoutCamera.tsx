@@ -32,6 +32,8 @@ interface WorkoutCameraProps {
   totalSets?: number;
   onLogCompletedReps: (exerciseId: string, reps: number, formSummary?: string) => void;
   onSkipExercise?: () => void;
+  onLogManually?: () => void;
+  onUseVoice?: () => void;
   onClose: () => void;
 }
 
@@ -42,6 +44,8 @@ export const WorkoutCamera: React.FC<WorkoutCameraProps> = ({
   totalSets = 3,
   onLogCompletedReps,
   onSkipExercise,
+  onLogManually,
+  onUseVoice,
   onClose
 }) => {
   // Educational briefing state
@@ -58,6 +62,7 @@ export const WorkoutCamera: React.FC<WorkoutCameraProps> = ({
   const [isPaused, setIsPaused] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [equipmentRestriction, setEquipmentRestriction] = useState<string | null>(null);
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
   // Reps & Form HUD State
   const [repCount, setRepCount] = useState(0);
@@ -168,7 +173,7 @@ export const WorkoutCamera: React.FC<WorkoutCameraProps> = ({
         window.speechSynthesis.cancel();
       }
     };
-  }, [equipmentRestriction, isPaused, formQuality, speakCue]);
+  }, [equipmentRestriction, isPaused, formQuality, speakCue, retryTrigger]);
 
   const handleFinishSet = () => {
     if (exercise && repCount > 0) {
@@ -308,15 +313,46 @@ export const WorkoutCamera: React.FC<WorkoutCameraProps> = ({
             </Button>
           </div>
         ) : errorMessage ? (
-          <div className="text-center p-8 max-w-md space-y-4">
+          <div className="text-center p-8 max-w-md space-y-4 bg-zinc-950 border border-zinc-850 rounded-2xl shadow-2xl">
             <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
               <CameraOff className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-white">Camera Offline</h3>
-            <p className="text-xs text-zinc-400 leading-relaxed">{errorMessage}</p>
-            <Button variant="outline" onClick={onClose} className="text-xs">
-              Back to Workout
-            </Button>
+            <h3 className="text-base font-bold text-white">Camera tracking isn't available right now.</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              {errorMessage || 'Camera access was blocked or could not be initialized. You can retry or switch to manual/voice logging.'}
+            </p>
+            <div className="flex flex-col gap-2 pt-2">
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setErrorMessage(null);
+                  setRetryTrigger(prev => prev + 1);
+                }}
+                className="w-full text-xs font-bold uppercase min-h-[44px]"
+              >
+                Try Again
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (onLogManually) onLogManually();
+                  else onClose();
+                }}
+                className="w-full text-xs font-bold uppercase min-h-[44px]"
+              >
+                Log Set Manually
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  if (onUseVoice) onUseVoice();
+                  else onClose();
+                }}
+                className="w-full text-xs font-bold uppercase text-cyan-400 hover:text-cyan-300 min-h-[44px]"
+              >
+                Use Voice
+              </Button>
+            </div>
           </div>
         ) : (
           <>

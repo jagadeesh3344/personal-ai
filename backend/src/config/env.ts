@@ -14,7 +14,7 @@ dotenv.config();
 const envSchema = z.object({
   PORT: z.string().default('4000').transform(val => parseInt(val, 10)),
   HOST: z.string().default('0.0.0.0'),
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
   FRONTEND_URL: z.string().default('http://localhost:3000'),
   SUPABASE_URL: z.string().url().default('https://placeholder-project.supabase.co'),
   SUPABASE_ANON_KEY: z.string().default('placeholder-anon-key'),
@@ -30,8 +30,8 @@ function loadEnv(): EnvConfig {
   if (!result.success) {
     console.error('❌ Configuration error: Invalid environment variables:');
     console.error(result.error.format());
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('Missing or invalid environment configuration in production.');
+    if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
+      throw new Error('Missing or invalid environment configuration in production/staging.');
     }
   }
   return result.success ? result.data : envSchema.parse({});

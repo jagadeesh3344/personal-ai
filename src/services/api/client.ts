@@ -21,9 +21,10 @@ class ApiClient {
   private token: string | null = null;
 
   constructor() {
+    const isProd = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.PROD);
     this.baseUrl = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) 
       ? (import.meta as any).env.VITE_API_URL 
-      : 'http://localhost:4000/api';
+      : (isProd ? '/api' : 'http://localhost:4000/api');
 
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem(TOKEN_STORAGE_KEY);

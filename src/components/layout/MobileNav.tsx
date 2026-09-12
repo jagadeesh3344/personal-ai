@@ -19,11 +19,11 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   setTab
 }) => {
   const navItems = [
-    { id: 'dashboard', label: 'Home', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { id: 'dashboard', label: 'Today', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'workout', label: 'Workout', icon: <Dumbbell className="w-5 h-5" /> },
     { id: 'friday', label: 'FRIDAY', icon: <Bot className="w-5 h-5 animate-pulse" />, isFriday: true },
     { id: 'nutrition', label: 'Fuel', icon: <Apple className="w-5 h-5" /> },
-    { id: 'habits', label: 'Habits', icon: <CheckSquare className="w-5 h-5" /> }
+    { id: 'progress', label: 'Progress', icon: <LineChart className="w-5 h-5" /> }
   ];
 
   return (
